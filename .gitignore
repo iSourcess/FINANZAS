@@ -1,0 +1,59 @@
+# Dependencias
+node_modules/
+
+# Build
+dist/
+dist-ssr/
+build/
+coverage/
+*.local
+
+# Variables de entorno y llaves
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+keystore.properties
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Android (Capacitor)
+android/.gradle/
+android/build/
+android/app/build/
+android/app/release/
+android/local.properties
+android/captures/
+android/.idea/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/app/src/main/res/xml/config.xml
+*.apk
+*.aab
+
+# Escritorio (Tauri, fase opcional)
+src-tauri/target/
+
+# Editores y sistema
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Respaldos de datos personales (nunca subir tus finanzas)
+backups/
+*.backup.json
+mis-movimientos*.csv
+
+# Scripts temporales
+scaffold.mjs

@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎨 TEMPORAL — Paleta de Design System · Finanzas App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&display=swap" rel="stylesheet" />
+  <style>
+    /* ══════════════════════════════════════════════════════
+       TOKENS (copia exacta de src/index.css para esta demo)
+       ══════════════════════════════════════════════════════ */
+    :root {
+      --bg-base:     #0A0A0A;
+      --bg-surface:  #111111;
+      --bg-elevated: #1A1A1A;
+      --bg-overlay:  #222222;
+
+      --border-subtle:  #2A2A2A;
+      --border-default: #383838;
+      --border-focus:   #FF7A1A;
+
+      --orange-50:  #FFF3E8;
+      --orange-100: #FFE0C0;
+      --orange-200: #FFBA80;
+      --orange-300: #FF9A45;
+      --orange-400: #FF7A1A;
+      --orange-500: #E86200;
+      --orange-600: #C45200;
+      --orange-700: #8A3A00;
+      --orange-800: #5C2600;
+      --orange-900: #2E1200;
+
+      --red-400: #F87171;
+      --red-500: #EF4444;
+      --red-600: #DC2626;
+      --red-900: #3B0A0A;
+
+      --text-primary:   #F5F5F5;
+      --text-secondary: #A3A3A3;
+      --text-muted:     #6B6B6B;
+      --text-inverse:   #0A0A0A;
+
+      --color-positive: var(--orange-400);
+      --color-negative: var(--red-400);
+      --color-warning:  #F59E0B;
+
+      --donut-1: #FF7A1A;
+      --donut-2: #FF9A45;
+      --donut-3: #FFBA80;
+      --donut-4: #FFE0C0;
+      --donut-5: #C45200;
+      --donut-6: #8A3A00;
+      --donut-7: #F59E0B;
+      --donut-8: #6B6B6B;
+
+      --radius-sm:   6px;
+      --radius-md:   10px;
+      --radius-lg:   14px;
+      --radius-xl:   20px;
+      --radius-full: 9999px;
+
+      --transition-micro: 150ms ease-out;
+      --transition-base:  200ms ease-in-out;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       BASE
+       ══════════════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg-base);
+      color: var(--text-primary);
+      font-family: 'DM Sans', system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+    }
+
+    h1, h2, h3, h4 {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+    }
+
+    .tnum {
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+    }
+
+    /* ══════════════════════════════════════════════════════
+       LAYOUT
+       ══════════════════════════════════════════════════════ */
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 16px 80px;
+    }
+
+    /* Banner temporal */
+    .temp-banner {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--color-warning);
+      color: #0A0A0A;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-align: center;
+      padding: 8px 16px;
+      text-transform: uppercase;
+    }
+
+    .section {
+      margin-top: 40px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    /* ══════════════════════════════════════════════════════
+       PALETA
+       ══════════════════════════════════════════════════════ */
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      gap: 8px;
+    }
+
+    .swatch {
+      aspect-ratio: 1;
+      border-radius: var(--radius-md);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 6px;
+      overflow: hidden;
+    }
+
+    .swatch-label {
+      font-size: 10px;
+      font-weight: 600;
+      font-family: 'Space Grotesk', monospace;
+      background: rgba(0,0,0,0.5);
+      padding: 2px 4px;
+      border-radius: 4px;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       TIPOGRAFÍA
+       ══════════════════════════════════════════════════════ */
+    .type-scale { display: flex; flex-direction: column; gap: 12px; }
+
+    .type-row {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      padding: 12px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+    }
+
+    .type-meta {
+      min-width: 100px;
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: 'Space Grotesk', monospace;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       BOTONES
+       ══════════════════════════════════════════════════════ */
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-height: 44px;
+      padding: 0 20px;
+      border-radius: var(--radius-md);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition:
+        background-color var(--transition-micro),
+        transform var(--transition-micro);
+      user-select: none;
+    }
+
+    .btn-primary {
+      background: var(--orange-400);
+      color: var(--text-inverse);
+      height: 48px;
+    }
+    .btn-primary:hover  { background: var(--orange-500); }
+    .btn-primary:active { background: var(--orange-600); transform: scale(0.98); }
+
+    .btn-secondary {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      border: 1px solid var(--border-default);
+    }
+    .btn-secondary:hover { background: var(--bg-overlay); border-color: var(--border-focus); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+    }
+    .btn-ghost:hover { background: var(--bg-overlay); color: var(--text-primary); }
+
+    .btn-danger {
+      background: var(--red-900);
+      color: var(--red-400);
+      border: 1px solid var(--red-600);
+    }
+    .btn-danger:hover { background: var(--red-600); color: var(--text-primary); }
+
+    /* ══════════════════════════════════════════════════════
+       TARJETAS
+       ══════════════════════════════════════════════════════ */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+    }
+
+    .card-elevated {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+    }
+
+    .card-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .card-amount {
+      font-family: 'Space Grotesk', monospace;
+      font-size: 32px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .card-amount.positive { color: var(--color-positive); }
+    .card-amount.negative { color: var(--color-negative); }
+
+    .card-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       BADGES
+       ══════════════════════════════════════════════════════ */
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      font-weight: 500;
+      font-family: 'DM Sans', sans-serif;
+      line-height: 1.4;
+    }
+
+    .badge-orange  { background: var(--orange-900); color: var(--orange-300); }
+    .badge-red     { background: var(--red-900);    color: var(--red-400);    }
+    .badge-neutral { background: var(--bg-elevated); color: var(--text-secondary); border: 1px solid var(--border-subtle); }
+    .badge-warning { background: rgba(245,158,11,0.15); color: var(--color-warning); }
+
+    /* ══════════════════════════════════════════════════════
+       INPUTS
+       ══════════════════════════════════════════════════════ */
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+
+    .form-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .input {
+      width: 100%;
+      height: 48px;
+      padding: 0 12px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      transition: border-color var(--transition-micro);
+      outline: none;
+    }
+    .input:focus { border-color: var(--border-focus); }
+    .input::placeholder { color: var(--text-muted); }
+
+    .input-amount {
+      width: 100%;
+      height: 56px;
+      padding: 0 12px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 24px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+      transition: border-color var(--transition-micro);
+      outline: none;
+    }
+    .input-amount:focus   { border-color: var(--border-focus); }
+    .input-amount::placeholder { color: var(--text-muted); font-weight: 400; }
+
+    .forms-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       TARJETAS DE BANCO
+       ══════════════════════════════════════════════════════ */
+    .bank-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+    }
+
+    .bank-card {
+      border-radius: var(--radius-xl);
+      padding: 20px 20px 16px;
+      min-height: 160px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .bank-card::before {
+      content: '';
+      position: absolute;
+      top: -40%;
+      right: -10%;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.06);
+    }
+
+    .bank-card::after {
+      content: '';
+      position: absolute;
+      bottom: -30%;
+      left: -5%;
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.04);
+    }
+
+    .bank-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .bank-card-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .bank-card-type {
+      font-size: 10px;
+      font-weight: 500;
+      opacity: 0.7;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      border: 1px solid currentColor;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+    }
+
+    .bank-card-bottom {
+      position: relative;
+      z-index: 1;
+    }
+
+    .bank-card-balance-label {
+      font-size: 10px;
+      opacity: 0.7;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+
+    .bank-card-balance {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+    }
+
+    /* ══════════════════════════════════════════════════════
+       DONUT PREVIEW
+       ══════════════════════════════════════════════════════ */
+    .donut-preview {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .donut-svg-wrapper {
+      flex-shrink: 0;
+    }
+
+    .donut-legend {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .donut-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .donut-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .donut-legend-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .donut-legend-amount {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+      margin-left: auto;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       SEPARADOR / DIVIDER
+       ══════════════════════════════════════════════════════ */
+    .divider {
+      height: 1px;
+      background: var(--border-subtle);
+      border: none;
+      margin: 0;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       ITEM DE LISTA (movimientos)
+       ══════════════════════════════════════════════════════ */
+    .list-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .list-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      transition: background-color var(--transition-micro);
+      cursor: pointer;
+    }
+    .list-item:hover { background: var(--bg-overlay); }
+
+    .list-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .list-info { flex: 1; min-width: 0; }
+
+    .list-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .list-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .list-amount {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+      white-space: nowrap;
+    }
+
+    .list-amount.positive { color: var(--color-positive); }
+    .list-amount.negative { color: var(--color-negative); }
+
+    /* ══════════════════════════════════════════════════════
+       PRESUPUESTO BARRA
+       ══════════════════════════════════════════════════════ */
+    .budget-bar-container { display: flex; flex-direction: column; gap: 12px; }
+
+    .budget-item { display: flex; flex-direction: column; gap: 6px; }
+
+    .budget-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .budget-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+    .budget-amounts { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+    .budget-track {
+      height: 6px;
+      background: var(--bg-elevated);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+    }
+
+    .budget-fill {
+      height: 100%;
+      border-radius: var(--radius-full);
+      transition: width 400ms ease-out;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       SKELETON
+       ══════════════════════════════════════════════════════ */
+    .skeleton {
+      background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-overlay) 50%, var(--bg-elevated) 75%);
+      background-size: 200% 100%;
+      animation: skeleton-shimmer 1.5s infinite;
+      border-radius: var(--radius-sm);
+    }
+
+    @keyframes skeleton-shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════════
+       BANNER TEMPORAL — ELIMINAR CUANDO EMPIECE FASE 2
+       ═══════════════════════════════════════════════════════ -->
+  <div class="temp-banner" role="banner">
+    ⚠️ PÁGINA TEMPORAL DE VALIDACIÓN — Solo para revisar la paleta · No es una pantalla real de la app ⚠️
+  </div>
+
+  <div class="page">
+
+    <!-- ── Encabezado ─────────────────────────────────────── -->
+    <div style="margin-top: 24px; margin-bottom: 8px;">
+      <h1 style="font-size: 24px; font-weight: 700; color: var(--text-primary);">
+        Finanzas App — Design System
+      </h1>
+      <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+        Validación de tokens de color · Fase 1 · <span style="color: var(--color-warning);">TEMPORAL</span>
+      </p>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         1. PALETA DE COLORES
+         ══════════════════════════════════════════════════════ -->
+    <div class="section">
+      <p class="section-title">1 — Paleta Naranja (acento único)</p>
+      <div class="palette-grid">
+        <div class="swatch" style="background:#FFF3E8;"><span class="swatch-label" style="color:#0A0A0A;">50<br>#FFF3E8</span></div>
+        <div class="swatch" style="background:#FFE0C0;"><span class="swatch-label" style="color:#0A0A0A;">100<br>#FFE0C0</span></div>
+        <div class="swatch" style="background:#FFBA80;"><span class="swatch-label" style="color:#0A0A0A;">200<br>#FFBA80</span></div>
+        <div class="swatch" style="background:#FF9A45;"><span class="swatch-label" style="color:#0A0A0A;">300<br>#FF9A45</span></div>
+        <div class="swatch" style="background:#FF7A1A; border: 2px solid #fff4; position:relative;">
+          <span style="position:absolute;top:6px;right:6px;font-size:9px;background:rgba(255,255,255,0.2);padding:2px 4px;border-radius:4px;font-weight:700;">MAIN</span>
+          <span class="swatch-label" style="color:#0A0A0A;">400<br>#FF7A1A</span>
+        </div>
+        <div class="swatch" style="background:#E86200;"><span class="swatch-label" style="color:#fff;">500<br>#E86200</span></div>
+        <div class="swatch" style="background:#C45200;"><span class="swatch-label" style="color:#fff;">600<br>#C45200</span></div>
+        <div class="swatch" style="background:#8A3A00;"><span class="swatch-label" style="color:#fff;">700<br>#8A3A00</span></div>
+        <div class="swatch" style="background:#5C2600;"><span class="swatch-label" style="color:#fff;">800<br>#5C2600</span></div>
+        <div class="swatch" style="background:#2E1200;border:1px solid var(--border-subtle);"><span class="swatch-label" style="color:#fff;">900<br>#2E1200</span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-title">2 — Rojo (solo negativo y alertas)</p>
+      <div class="palette-grid">
+        <div class="swatch" style="background:#F87171;"><span class="swatch-label" style="color:#0A0A0A;">400<br>#F87171</span></div>
+        <div class="swatch" style="background:#EF4444;"><span class="swatch-label" style="color:#fff;">500<br>#EF4444</span></div>
+        <div class="swatch" style="background:#DC2626;"><span class="swatch-label" style="color:#fff;">600<br>#DC2626</span></div>
+        <div class="swatch" style="background:#3B0A0A;border:1px solid var(--border-subtle);"><span class="swatch-label" style="color:#F87171;">900<br>#3B0A0A</span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-title">3 — Superficies y fondos</p>
+      <div class="palette-grid">
+        <div class="swatch" style="background:#0A0A0A;border:1px solid var(--border-subtle);"><span class="swatch-label" style="color:#fff;">base<br>#0A0A0A</span></div>
+        <div class="swatch" style="background:#111111;border:1px solid var(--border-subtle);"><span class="swatch-label" style="color:#fff;">surface<br>#111111</span></div>
+        <div class="swatch" style="background:#1A1A1A;border:1px solid var(--border-subtle);"><span class="swatch-label" style="color:#fff;">elevated<br>#1A1A1A</span></div>
+        <div class="swatch" style="background:#222222;border:1px solid var(--border-subtle);"><span class="swatch-label" style="color:#fff;">overlay<br>#222222</span></div>
+        <div class="swatch" style="background:#2A2A2A;"><span class="swatch-label" style="color:#fff;">b-subtle<br>#2A2A2A</span></div>
+        <div class="swatch" style="background:#383838;"><span class="swatch-label" style="color:#fff;">b-default<br>#383838</span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-title">4 — Texto</p>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:20px;height:20px;border-radius:50%;background:#F5F5F5;flex-shrink:0;"></div>
+          <span style="color:#F5F5F5;font-size:14px;font-weight:500;">primary #F5F5F5 — Texto principal, montos</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:20px;height:20px;border-radius:50%;background:#A3A3A3;flex-shrink:0;"></div>
+          <span style="color:#A3A3A3;font-size:14px;">secondary #A3A3A3 — Labels, metadata</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:20px;height:20px;border-radius:50%;background:#6B6B6B;flex-shrink:0;"></div>
+          <span style="color:#6B6B6B;font-size:14px;">muted #6B6B6B — Placeholders, deshabilitado</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-title">5 — Categorías donut (8 slots)</p>
+      <div class="palette-grid">
+        <div class="swatch" style="background:var(--donut-1);"><span class="swatch-label" style="color:#0A0A0A;">1 Comida</span></div>
+        <div class="swatch" style="background:var(--donut-2);"><span class="swatch-label" style="color:#0A0A0A;">2 Trans.</span></div>
+        <div class="swatch" style="background:var(--donut-3);"><span class="swatch-label" style="color:#0A0A0A;">3 Entret.</span></div>
+        <div class="swatch" style="background:var(--donut-4);"><span class="swatch-label" style="color:#0A0A0A;">4 Salud</span></div>
+        <div class="swatch" style="background:var(--donut-5);"><span class="swatch-label" style="color:#fff;">5 Hogar</span></div>
+        <div class="swatch" style="background:var(--donut-6);"><span class="swatch-label" style="color:#fff;">6 Ropa</span></div>
+        <div class="swatch" style="background:var(--donut-7);"><span class="swatch-label" style="color:#0A0A0A;">7 Educ.</span></div>
+        <div class="swatch" style="background:var(--donut-8);"><span class="swatch-label" style="color:#fff;">8 Otros</span></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         2. TIPOGRAFÍA
+         ══════════════════════════════════════════════════════ -->
+    <div class="section">
+      <p class="section-title">6 — Tipografía (Space Grotesk + DM Sans)</p>
+      <div class="type-scale">
+        <div class="type-row">
+          <span class="type-meta">display<br>32px / 700</span>
+          <span style="font-family:'Space Grotesk';font-size:2rem;font-weight:700;color:var(--text-primary);">$23,450.00</span>
+        </div>
+        <div class="type-row">
+          <span class="type-meta">title-lg<br>24px / 600</span>
+          <span style="font-family:'Space Grotesk';font-size:1.5rem;font-weight:600;color:var(--text-primary);">Panorama general</span>
+        </div>
+        <div class="type-row">
+          <span class="type-meta">title<br>20px / 600</span>
+          <span style="font-family:'Space Grotesk';font-size:1.25rem;font-weight:600;color:var(--text-primary);">Nu Débito</span>
+        </div>
+        <div class="type-row">
+          <span class="type-meta">body-lg<br>16px / 500</span>
+          <span style="font-size:1rem;font-weight:500;color:var(--text-primary);">Saldo disponible: $12,000</span>
+        </div>
+        <div class="type-row">
+          <span class="type-meta">body<br>14px / 400</span>
+          <span style="font-size:0.875rem;color:var(--text-secondary);">Última actualización: hoy a las 10:32 AM</span>
+        </div>
+        <div class="type-row">
+          <span class="type-meta">caption<br>12px / 400</span>
+          <span style="font-size:0.75rem;color:var(--text-muted);">Rendimiento estimado. No refleja intereses oficiales del banco.</span>
+        </div>
+        <div class="type-row">
+          <span class="type-meta">label<br>11px / 500</span>
+          <span style="font-size:0.6875rem;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);">Categoría</span>
+        </div>
+        <div class="type-row">
+          <span class="type-meta">tabular<br>tnum</span>
+          <span style="font-family:'Space Grotesk';font-size:1.5rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--color-positive);">+$1,234.56</span>
+          <span style="margin-left:16px;font-family:'Space Grotesk';font-size:1.5rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--color-negative);">-$987.00</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         3. BOTONES
+         ══════════════════════════════════════════════════════ -->
+    <div class="section">
+      <p class="section-title">7 — Botones</p>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-primary">Guardar movimiento</button>
+        <button class="btn btn-secondary" id="btn-secondary">Cancelar</button>
+        <button class="btn btn-ghost" id="btn-ghost">Ver más</button>
+        <button class="btn btn-danger" id="btn-danger">Eliminar</button>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         4. TARJETAS RESUMEN
+         ══════════════════════════════════════════════════════ -->
+    <div class="section">
+      <p class="section-title">8 — Tarjetas resumen (Panorama)</p>
+      <div class="cards-grid">
+        <div class="card">
+          <p class="card-label">Ingresos del mes</p>
+          <p class="card-amount positive tnum">+$18,500.00</p>
+          <p class="card-sub">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-positive)"><polyline points="18 15 12 9 6 15"/></svg>
+            12% más que septiembre
+          </p>
+        </div>
+        <div class="card">
+          <p class="card-label">Gastos del mes</p>
+          <p class="card-amount negative tnum">-$9,312.50</p>
+          <p class="card-sub">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-negative)"><polyline points="6 9 12 15 18 9"/></svg>
+            5% más que septiembre
+          </p>
+        </div>
+        <div class="card">
+          <p class="card-label">Balance</p>
+          <p class="card-amount tnum">+$9,187.50</p>
+          <p class="card-sub" style="color:var(--text-muted);">Octubre 2026</p>
+        </div>
+        <div class="card-elevated">
+          <p class="card-label">Patrimonio total</p>
+          <p class="card-amount tnum" style="font-size:2rem;">$47,823.12</p>
+          <p class="card-sub" style="color:var(--text-muted);">efectivo + débito + inversiones − deuda</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         5. BADGES
+         ══════════════════════════════════════════════════════ -->
+    <div class="section">
+      <p class="section-title">9 — Badges y etiquetas</p>
+      <div class="badge-row">
+        <span class="badge badge-orange">Ingreso</span>
+        <span class="badge badge-red">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Límite al 95%
+        </span>
+        <span class="badge badge-warning">Al 80% del presupuesto</span>
+        <span class="badge badge-neutral">Crédito</span>
+        <span class="badge badge-neutral">MXN</span>
+        <span class="badge badge-neutral">3 de 12 MSI</span>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         6. INPUTS
+         ══════════════════════════════════════════════════════ -->
+    <div class="section">
+      <p class="section-title">10 — Inputs</p>
+      <div class="forms-grid">
+        <div class="form-group">
+          <label class="form-label" for="demo-amount">Monto</label>
+          <input class="input-amount" id="demo-amount" type="text" placeholder="0.00" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="demo-note">Nota</label>
+          <input class="input" id="demo-note" type="text" placeholder="Ej. Súper del sábado" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="demo-date">Fecha</label>
+          <input class="input" id="demo-date" type="date" value="2026-10-12" />
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         7. TARJETAS DE BANCO
+         ══════════════════════════════════════════════════════ -->
+    <div class="section">
+      <p class="section-title">11 — Tarjetas de banco (Wallet) — Colores en constants.js</p>
+      <div class="bank-cards-grid">
+
+        <!-- Nu -->
+        <div class="bank-card" style="background:linear-gradient(135deg,#820AD1,#9E2AE0);">
+          <div class="bank-card-header">
+            <span class="bank-card-name" style="color:#FFFFFF;">Nu</span>
+            <span class="bank-card-type" style="color:#FFFFFF;">Crédito</span>
+          </div>
+          <div class="bank-card-bottom">
+            <p class="bank-card-balance-label" style="color:rgba(255,255,255,0.65);">Disponible</p>
+            <p class="bank-card-balance tnum" style="color:#FFFFFF;">$12,000.00</p>
+          </div>
+        </div>
+
+        <!-- Revolut -->
+        <div class="bank-card" style="background:linear-gradient(135deg,#191C1F,#242830);">
+          <div class="bank-card-header">
+            <span class="bank-card-name" style="color:#FFFFFF;">Revolut</span>
+            <span class="bank-card-type" style="color:#0666EB;border-color:#0666EB;">Débito</span>
+          </div>
+          <div class="bank-card-bottom">
+            <p class="bank-card-balance-label" style="color:rgba(255,255,255,0.55);">Saldo</p>
+            <p class="bank-card-balance tnum" style="color:#FFFFFF;">$8,420.35</p>
+          </div>
+        </div>
+
+        <!-- Mercado Pago -->
+        <div class="bank-card" style="background:linear-gradient(135deg,#dfdb14,#e8e42a);">
+          <div class="bank-card-header">
+            <span class="bank-card-name" style="color:#111111;">Mercado Pago</span>
+            <span class="bank-card-type" style="color:#111111;border-color:rgba(0,0,0,0.3);">Débito</span>
+          </div>
+          <div class="bank-card-bottom">
+            <p class="bank-card-balance-label" style="color:rgba(0,0,0,0.55);">Saldo</p>
+            <p class="bank-card-balance tnum" style="color:#111111;">$3,150.00</p>
+          </div>
+        </div>
+
+        <!-- BBVA -->
+        <div class="bank-card" style="background:linear-gradient(135deg,#072146,#0d3570);">
+          <div class="bank-card-header">
+            <span class="bank-card-name" style="color:#FFFFFF;">BBVA</span>
+            <span class="bank-card-type" style="color:#1973B8;border-color:#1973B8;">Débito</span>
+          </div>
+          <div class="bank-card-bottom">
+            <p class="bank-card-balance-label" style="color:rgba(255,255,255,0.55);">Saldo</p>
+            <p class="bank-card-balance tnum" style="color:#FFFFFF;">$2,880.00</p>
+          </div>
+        </div>
+
+        <!-- Efectivo -->
+        <div class="bank-card" style="background:linear-gradient(135deg,#FF7A1A,#FF9A45);">
+          <div class="bank-card-header">
+            <span class="bank-card-name" style="color:#0A0A0A;">Efectivo</span>
+            <span class="bank-card-type" style="color:#0A0A0A;border-color:rgba(0,0,0,0.3);">Cash</span>
+          </div>
+          <div class="bank-card-bottom">
+            <p class="bank-card-balance-label" style="color:rgba(0,0,0,0.55);">En mano</p>
+            <p class="bank-card-balance tnum" style="color:#0A0A0A;">$750.00</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         8. DONUT PREVIEW
+         ══════════════════════════════════════════════════════ -->
+    <div class="section">
+      <p class="section-title">12 — Escala del donut (categorías)</p>
+      <div class="card">
+        <div class="donut-preview">
+          <!-- SVG donut simple -->
+          <div class="donut-svg-wrapper">
+            <svg width="140" height="140" viewBox="0 0 140 140">
+              <!-- Donut con 8 segmentos (simplificado) -->
+              <circle cx="70" cy="70" r="50" fill="none" stroke="#FF7A1A" stroke-width="22" stroke-dasharray="80 235" stroke-dashoffset="0" transform="rotate(-90 70 70)"/>
+              <circle cx="70" cy="70" r="50" fill="none" stroke="#FF9A45" stroke-width="22" stroke-dasharray="50 235" stroke-dashoffset="-80" transform="rotate(-90 70 70)"/>
+              <circle cx="70" cy="70" r="50" fill="none" stroke="#FFBA80" stroke-width="22" stroke-dasharray="35 235" stroke-dashoffset="-130" transform="rotate(-90 70 70)"/>
+              <circle cx="70" cy="70" r="50" fill="none" stroke="#C45200" stroke-width="22" stroke-dasharray="28 235" stroke-dashoffset="-165" transform="rotate(-90 70 70)"/>
+              <circle cx="70" cy="70" r="50" fill="none" stroke="#8A3A00" stroke-width="22" stroke-dasharray="22 235" stroke-dashoffset="-193" transform="rotate(-90 70 70)"/>
+              <circle cx="70" cy="70" r="50" fill="none" stroke="#F59E0B" stroke-width="22" stroke-dasharray="15 235" stroke-dashoffset="-215" transform="rotate(-90 70 70)"/>
+              <circle cx="70" cy="70" r="50" fill="none" stroke="#6B6B6B" stroke-width="22" stroke-dasharray="5 235" stroke-dashoffset="-230" transform="rotate(-90 70 70)"/>
+              <!-- Círculo centro para efecto donut -->
+              <circle cx="70" cy="70" r="35" fill="#111111"/>
+              <!-- Texto centro -->
+              <text x="70" y="65" text-anchor="middle" font-family="Space Grotesk" font-size="11" font-weight="600" fill="#F5F5F5">Total</text>
+              <text x="70" y="80" text-anchor="middle" font-family="Space Grotesk" font-size="12" font-weight="700" fill="#FF7A1A">$9,312</text>
+            </svg>
+          </div>
+
+          <!-- Leyenda -->
+          <div class="donut-legend" style="flex:1;">
+            <div class="donut-legend-item">
+              <div class="donut-dot" style="background:var(--donut-1);"></div>
+              <span class="donut-legend-label">Comida y bebida</span>
+              <span class="donut-legend-amount tnum">$2,980</span>
+            </div>
+            <div class="donut-legend-item">
+              <div class="donut-dot" style="background:var(--donut-2);"></div>
+              <span class="donut-legend-label">Transporte</span>
+              <span class="donut-legend-amount tnum">$1,850</span>
+            </div>
+            <div class="donut-legend-item">
+              <div class="donut-dot" style="background:var(--donut-3);"></div>
+              <span class="donut-legend-label">Entretenimiento</span>
+              <span class="donut-legend-amount tnum">$1,300</span>
+            </div>
+            <div class="donut-legend-item">
+              <div class="donut-dot" style="background:var(--donut-5);"></div>
+              <span class="donut-legend-label">Hogar</span>
+              <span class="donut-legend-amount tnum">$1,050</span>
+            </div>
+            <div class="donut-legend-item">
+              <div class="donut-dot" style="background:var(--donut-6);"></div>
+              <span class="donut-legend-label">Ropa</span>
+              <span class="donut-legend-amount tnum">$820</span>
+            </div>
+            <div class="donut-legend-item">
+              <div class="donut-dot" style="background:var(--donut-7);"></div>
+              <span class="donut-legend-label">Educación</span>
+              <span class="donut-legend-amount tnum">$562</span>
+            </div>
+            <div class="donut-legend-item">
+              <div class="donut-dot" style="background:var(--donut-8);"></div>
+              <span class="donut-legend-label">Otros</span>
+              <span class="donut-legend-amount tnum">$180</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         9. LISTA DE MOVIMIENTOS
+         ══════════════════════════════════════════════════════ -->
+    <div class="section">
+      <p class="section-title">13 — Lista de movimientos (muestra)</p>
+      <div class="list-card">
+        <div class="list-item">
+          <div class="list-icon" style="background:var(--orange-900);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--orange-400)" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>
+          <div class="list-info">
+            <p class="list-title">Renta</p>
+            <p class="list-sub">Hogar · Nu Crédito</p>
+          </div>
+          <span class="list-amount negative tnum">-$8,500.00</span>
+        </div>
+        <hr class="divider"/>
+        <div class="list-item">
+          <div class="list-icon" style="background:var(--orange-900);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--orange-400)" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          </div>
+          <div class="list-info">
+            <p class="list-title">Supermercado</p>
+            <p class="list-sub">Comida · BBVA</p>
+          </div>
+          <span class="list-amount negative tnum">-$623.40</span>
+        </div>
+        <hr class="divider"/>
+        <div class="list-item">
+          <div class="list-icon" style="background:var(--orange-900);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-positive)" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+          <div class="list-info">
+            <p class="list-title">Nómina</p>
+            <p class="list-sub">Ingreso · Nu Débito</p>
+          </div>
+          <span class="list-amount positive tnum">+$18,500.00</span>
+        </div>
+        <hr class="divider"/>
+        <div class="list-item">
+          <div class="list-icon" style="background:var(--bg-elevated);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          </div>
+          <div class="list-info">
+            <p class="list-title">Transferencia a Nu</p>
+            <p class="list-sub">BBVA → Nu Débito</p>
+          </div>
+          <span class="list-amount tnum" style="color:var(--text-secondary);">$2,000.00</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         10. BARRAS DE PRESUPUESTO
+         ══════════════════════════════════════════════════════ -->
+    <div class="section">
+      <p class="section-title">14 — Presupuesto por categoría</p>
+      <div class="card">
+        <div class="budget-bar-container">
+          <!-- Normal < 80% -->
+          <div class="budget-item">
+            <div class="budget-header">
+              <span class="budget-name">Comida y bebida</span>
+              <span class="budget-amounts tnum">$2,980 / $4,000</span>
+            </div>
+            <div class="budget-track">
+              <div class="budget-fill" style="width:74.5%;background:var(--orange-400);"></div>
+            </div>
+          </div>
+          <!-- Alerta 80–99% -->
+          <div class="budget-item">
+            <div class="budget-header">
+              <span class="budget-name">Transporte</span>
+              <span class="budget-amounts tnum" style="color:var(--color-warning);">$1,850 / $2,000</span>
+            </div>
+            <div class="budget-track">
+              <div class="budget-fill" style="width:92.5%;background:var(--color-warning);"></div>
+            </div>
+          </div>
+          <!-- Excedido 100% -->
+          <div class="budget-item">
+            <div class="budget-header">
+              <span class="budget-name">Entretenimiento</span>
+              <span class="budget-amounts tnum" style="color:var(--color-negative);">$1,300 / $1,000</span>
+            </div>
+            <div class="budget-track">
+              <div class="budget-fill" style="width:100%;background:var(--red-500);"></div>
+            </div>
+          </div>
+          <!-- OK bajo -->
+          <div class="budget-item">
+            <div class="budget-header">
+              <span class="budget-name">Hogar</span>
+              <span class="budget-amounts tnum">$1,050 / $5,000</span>
+            </div>
+            <div class="budget-track">
+              <div class="budget-fill" style="width:21%;background:var(--orange-400);"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         11. SKELETON LOADER
+         ══════════════════════════════════════════════════════ -->
+    <div class="section">
+      <p class="section-title">15 — Skeleton (carga)</p>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div class="skeleton" style="height:20px;width:40%;"></div>
+        <div class="skeleton" style="height:36px;width:65%;"></div>
+        <div class="skeleton" style="height:14px;width:30%;margin-top:4px;"></div>
+      </div>
+    </div>
+
+    <!-- ── Footer ──────────────────────────────────────────── -->
+    <div style="margin-top:48px;padding-top:16px;border-top:1px solid var(--border-subtle);text-align:center;">
+      <p style="font-size:12px;color:var(--text-muted);">
+        ⚠️ ARCHIVO TEMPORAL · <code style="font-family:monospace;color:var(--orange-300);">design-system/pages/palette-preview.html</code> ·
+        Eliminar antes de producción
+      </p>
+    </div>
+
+  </div><!-- /page -->
+
+</body>
+</html>
