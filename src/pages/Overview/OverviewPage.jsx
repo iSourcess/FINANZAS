@@ -377,7 +377,7 @@ export default function OverviewPage() {
                         budgetsSummary.overallPercent > 100
                           ? 'var(--red-400)'
                           : budgetsSummary.overallPercent >= 80
-                          ? '#F59E0B'
+                          ? 'var(--color-warning)'
                           : 'var(--orange-400)',
                     }}
                   >

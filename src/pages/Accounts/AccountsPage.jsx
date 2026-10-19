@@ -10,15 +10,18 @@
  */
 
 import { useEffect, useState, useMemo } from 'react'
-import { Plus, Wallet, TrendingUp, TrendingDown, ShieldCheck } from 'lucide-react'
+import { Plus, Wallet, TrendingUp, TrendingDown, ShieldCheck, CandlestickChart } from 'lucide-react'
 import { useAccounts } from '../../store/useAccounts.js'
 import { useMovements } from '../../store/useMovements.js'
+import { useInvestments } from '../../store/useInvestments.js'
 import CardStack from '../../components/wallet/CardStack.jsx'
 import AccountDetailModal from '../../components/wallet/AccountDetailModal.jsx'
 import AccountForm from '../../components/forms/AccountForm.jsx'
 import MovementForm from '../../components/forms/MovementForm.jsx'
+import HoldingsList from '../../components/investments/HoldingsList.jsx'
 import Modal from '../../components/ui/Modal.jsx'
 import Button from '../../components/ui/Button.jsx'
+import { calculateNetWorth } from '../../domain/netWorth.js'
 import { formatMoney } from '../../lib/format.js'
 
 export default function AccountsPage() {
@@ -32,6 +35,22 @@ export default function AccountsPage() {
     deleteAccount,
   } = useAccounts()
 
+  const {
+    holdings,
+    priceMap,
+    fxRate,
+    fxSource,
+    hasFinnhubKey,
+    refreshing: refreshingPrices,
+    fetchHoldings,
+    refreshPrices,
+    addHolding,
+    updateHolding,
+    deleteHolding,
+  } = useInvestments()
+
+  const [activeTab, setActiveTab] = useState('wallet') // 'wallet' | 'investments'
+
   // Modales
   const [selectedAccount, setSelectedAccount] = useState(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -40,34 +59,24 @@ export default function AccountsPage() {
 
   const { addMovement } = useMovements()
 
-  // Cargar cuentas de Dexie al montar
+  // Cargar cuentas e inversiones de Dexie al montar
   useEffect(() => {
     fetchAccounts()
-  }, [fetchAccounts])
+    fetchHoldings()
+  }, [fetchAccounts, fetchHoldings])
 
-  // ── Cálculo del Patrimonio Total ──
-  // Patrimonio = (Efectivo + Débito + Ahorro) - Deuda de crédito
-  const { totalAssets, totalDebt, netWorth } = useMemo(() => {
-    let assets = 0
-    let debt = 0
-
-    accounts.forEach((acc) => {
-      const bal = acc.balance || 0
-      if (acc.type === 'credit') {
-        debt += bal // En crédito, balance representa la deuda
-      } else {
-        assets += bal // En débito, efectivo y ahorro representa saldo a favor
-      }
+  // ── Cálculo del Patrimonio Total Consolidado ──
+  // Patrimonio = Efectivo + Débito/Ahorro + Inversiones − Deuda de crédito
+  const netWorthSummary = useMemo(() => {
+    return calculateNetWorth({
+      accounts,
+      holdings,
+      priceMap,
+      fxRate,
     })
+  }, [accounts, holdings, priceMap, fxRate])
 
-    return {
-      totalAssets: assets,
-      totalDebt: debt,
-      netWorth: assets - debt,
-    }
-  }, [accounts])
-
-  // Abrir modal de creación
+  // Abrir modal de creación de cuenta
   const handleOpenCreate = () => {
     setEditingAccount(null)
     setIsFormOpen(true)
@@ -104,18 +113,20 @@ export default function AccountsPage() {
             Cuentas
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            Billetera digital y patrimonio neto
+            Billetera digital, inversiones y patrimonio neto
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          size="sm"
-          icon={Plus}
-          onClick={handleOpenCreate}
-        >
-          Nueva cuenta
-        </Button>
+        {activeTab === 'wallet' && (
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={handleOpenCreate}
+          >
+            Nueva cuenta
+          </Button>
+        )}
       </div>
 
       {/* ── Mensaje de Error si ocurre ── */}
@@ -132,7 +143,7 @@ export default function AccountsPage() {
         </div>
       )}
 
-      {/* ── Hero: Tarjeta de Patrimonio Total ── */}
+      {/* ── Hero: Tarjeta de Patrimonio Total Consolidado ── */}
       <div
         className="rounded-2xl p-5 sm:p-6 relative overflow-hidden"
         style={{
@@ -164,20 +175,20 @@ export default function AccountsPage() {
             className="block text-3xl sm:text-4xl font-bold tracking-tight"
             style={{
               fontFamily: "'Space Grotesk', sans-serif",
-              color: netWorth >= 0 ? 'var(--text-primary)' : 'var(--red-400)',
+              color: netWorthSummary.netWorthCents >= 0 ? 'var(--text-primary)' : 'var(--red-400)',
               fontVariantNumeric: 'tabular-nums',
             }}
           >
-            {formatMoney(netWorth)}
+            {formatMoney(netWorthSummary.netWorthCents)}
           </span>
           <span className="text-xs text-[var(--text-muted)] mt-1 block">
-            Efectivo + Débito − Deuda en tarjetas
+            Efectivo + Débito + Inversiones − Deuda en tarjetas
           </span>
         </div>
 
-        {/* ── Desglose de Activos y Deuda ── */}
-        <div className="grid grid-cols-2 gap-3 pt-4 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
-          {/* Activos Disponibles */}
+        {/* ── Desglose de Activos, Inversiones y Deuda ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+          {/* Activos Bancarios (Efectivo + Débito) */}
           <div
             className="p-3 rounded-xl"
             style={{
@@ -187,7 +198,7 @@ export default function AccountsPage() {
           >
             <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] mb-1">
               <TrendingUp size={14} className="text-[var(--orange-400)]" />
-              <span>Activos disponibles</span>
+              <span>Efectivo y débito</span>
             </div>
             <span
               className="block font-bold text-base sm:text-lg text-white"
@@ -196,7 +207,40 @@ export default function AccountsPage() {
                 fontVariantNumeric: 'tabular-nums',
               }}
             >
-              {formatMoney(totalAssets)}
+              {formatMoney(netWorthSummary.cashCents + netWorthSummary.debitCents)}
+            </span>
+          </div>
+
+          {/* Inversiones */}
+          <div
+            className="p-3 rounded-xl"
+            style={{
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-subtle)',
+            }}
+          >
+            <div className="flex items-center justify-between gap-1 text-xs text-[var(--text-secondary)] mb-1">
+              <div className="flex items-center gap-1.5">
+                <CandlestickChart size={14} className="text-[var(--orange-400)]" />
+                <span>Inversiones</span>
+              </div>
+              <span
+                className="text-[11px] font-mono font-semibold"
+                style={{
+                  color: netWorthSummary.investmentsGainLossCents >= 0 ? 'var(--orange-400)' : 'var(--red-400)',
+                }}
+              >
+                {netWorthSummary.investmentsGainLossPercent >= 0 ? '+' : ''}{netWorthSummary.investmentsGainLossPercent}%
+              </span>
+            </div>
+            <span
+              className="block font-bold text-base sm:text-lg text-white"
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {formatMoney(netWorthSummary.investmentsCents)}
             </span>
           </div>
 
@@ -216,46 +260,89 @@ export default function AccountsPage() {
               className="block font-bold text-base sm:text-lg"
               style={{
                 fontFamily: "'Space Grotesk', sans-serif",
-                color: totalDebt > 0 ? 'var(--red-400)' : 'var(--text-muted)',
+                color: netWorthSummary.debtCents > 0 ? 'var(--red-400)' : 'var(--text-muted)',
                 fontVariantNumeric: 'tabular-nums',
               }}
             >
-              {formatMoney(totalDebt)}
+              {formatMoney(netWorthSummary.debtCents)}
             </span>
           </div>
         </div>
       </div>
 
-      {/* ── Sección de la Billetera Visual (Google Wallet) ── */}
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h2
-            style={{
-              fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: 'var(--font-size-lg)',
-              fontWeight: 600,
-              color: 'var(--text-primary)',
-            }}
-          >
-            Billetera
-          </h2>
-          <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
-            <ShieldCheck size={14} /> Datos en tu dispositivo
-          </span>
-        </div>
+      {/* ── Selector de Pestañas: Billetera vs Inversiones ── */}
+      <div className="flex rounded-xl p-1 bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+        <button
+          onClick={() => setActiveTab('wallet')}
+          className={`flex-1 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition-colors ${
+            activeTab === 'wallet'
+              ? 'bg-[var(--orange-500)] text-black'
+              : 'text-[var(--text-secondary)] hover:text-white'
+          }`}
+        >
+          <Wallet size={15} />
+          <span>Billetera ({accounts.length})</span>
+        </button>
 
-        {loading && accounts.length === 0 ? (
-          <div className="py-12 text-center text-xs text-[var(--text-muted)]">
-            Cargando billetera...
+        <button
+          onClick={() => setActiveTab('investments')}
+          className={`flex-1 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition-colors ${
+            activeTab === 'investments'
+              ? 'bg-[var(--orange-500)] text-black'
+              : 'text-[var(--text-secondary)] hover:text-white'
+          }`}
+        >
+          <CandlestickChart size={15} />
+          <span>Inversiones ({holdings.length})</span>
+        </button>
+      </div>
+
+      {/* ── Contenido según Pestaña Activa ── */}
+      {activeTab === 'wallet' ? (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h2
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+              }}
+            >
+              Billetera
+            </h2>
+            <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
+              <ShieldCheck size={14} /> Datos en tu dispositivo
+            </span>
           </div>
-        ) : (
-          <CardStack
-            accounts={accounts}
-            onSelectAccount={(acc) => setSelectedAccount(acc)}
-            onAddNew={handleOpenCreate}
+
+          {loading && accounts.length === 0 ? (
+            <div className="py-12 text-center text-xs text-[var(--text-muted)]">
+              Cargando billetera...
+            </div>
+          ) : (
+            <CardStack
+              accounts={accounts}
+              onSelectAccount={(acc) => setSelectedAccount(acc)}
+              onAddNew={handleOpenCreate}
+            />
+          )}
+        </section>
+      ) : (
+        <section className="flex flex-col gap-3">
+          <HoldingsList
+            holdingsCalculated={netWorthSummary.holdingsCalculated}
+            fxRate={fxRate}
+            fxSource={fxSource}
+            hasFinnhubKey={hasFinnhubKey}
+            refreshing={refreshingPrices}
+            onRefresh={refreshPrices}
+            onAddHolding={addHolding}
+            onUpdateHolding={updateHolding}
+            onDeleteHolding={deleteHolding}
           />
-        )}
-      </section>
+        </section>
+      )}
 
       {/* ── Modal de Detalle de Cuenta ── */}
       <AccountDetailModal

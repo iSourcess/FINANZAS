@@ -6,10 +6,15 @@
  * (Registrar, Panorama, Cuentas). Ajustes no usa este layout.
  */
 
+import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import BottomNav from './BottomNav.jsx'
+import { useBudgets } from '../../store/useBudgets.js'
 
 export default function AppLayout() {
+  useEffect(() => {
+    useBudgets.getState().fetchBudgets()
+  }, [])
   return (
     <div
       className="flex flex-col"

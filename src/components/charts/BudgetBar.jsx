@@ -28,7 +28,7 @@ export default function BudgetBar({
   const barColor = isDanger
     ? 'var(--red-400)'
     : isWarning
-    ? '#F59E0B'
+    ? 'var(--color-warning)'
     : 'var(--orange-400)'
 
   const IconComp = isDanger

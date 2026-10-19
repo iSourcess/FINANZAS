@@ -133,6 +133,8 @@ export function calculateBudgetsSummary({
     items,
     totalSpentCents,
     totalLimitCents,
+    totalSpent: totalSpentCents,
+    totalLimit: totalLimitCents,
     overallPercent,
     exceededCount,
     warningCount,

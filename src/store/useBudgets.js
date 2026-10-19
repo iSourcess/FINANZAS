@@ -30,15 +30,15 @@ export const useBudgets = create((set, get) => ({
   fetchBudgets: async () => {
     set({ loading: true, error: null })
     try {
-      const [allBudgets, allFixed] = await Promise.all([
+      const [allBudgets, allFixed, allMovements] = await Promise.all([
         db.budgets.toArray(),
         db.fixedExpenses.toArray(),
+        db.movements.toArray(),
       ])
 
-      const movements = useMovements.getState().movements
       const pending = getPendingRecurringExpenses({
         fixedExpenses: allFixed,
-        movements,
+        movements: allMovements,
         referenceDate: new Date(),
       })
 
@@ -119,16 +119,7 @@ export const useBudgets = create((set, get) => ({
       }
 
       await db.fixedExpenses.add(newFixed)
-
-      const updated = await db.fixedExpenses.toArray()
-      const movements = useMovements.getState().movements
-      const pending = getPendingRecurringExpenses({
-        fixedExpenses: updated,
-        movements,
-        referenceDate: new Date(),
-      })
-
-      set({ fixedExpenses: updated, pendingRecurring: pending, loading: false })
+      await get().fetchBudgets()
       return newFixed
     } catch (err) {
       console.error('[useBudgets] Error al agregar gasto fijo:', err)
