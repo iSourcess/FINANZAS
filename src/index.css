@@ -426,3 +426,28 @@
   .border-default { border-color: var(--border-default); }
   .border-orange  { border-color: var(--orange-400);     }
 }
+
+/* ============================================================
+   Animaciones de arrastre (CardStack / WalletCard)
+   ============================================================ */
+
+@keyframes wallet-wobble {
+  0%   { rotate: 0deg;     }
+  25%  { rotate: 1.5deg;   }
+  50%  { rotate: 0deg;     }
+  75%  { rotate: -1.5deg;  }
+  100% { rotate: 0deg;     }
+}
+
+/* La clase se aplica en JS cuando isDragging = true */
+.wallet-card-dragging {
+  animation: wallet-wobble 500ms ease-in-out infinite;
+  cursor: grabbing !important;
+}
+
+/* Respeta prefers-reduced-motion: suprime el temblor, conserva elevación */
+@media (prefers-reduced-motion: reduce) {
+  .wallet-card-dragging {
+    animation: none !important;
+  }
+}

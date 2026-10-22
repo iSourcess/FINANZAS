@@ -245,6 +245,89 @@ permiso de acceso a notificaciones, bandeja "Por confirmar" y parseo por app de 
 Incluye riesgos, pasos y qué archivos tocarías.
 ```
 
+```
+Lee docs/PLAN.md, AGENTS.md y design-system/MASTER.md. Tarea: reordenar tarjetas de la billetera
+con pulsación larga. No cambies lógica financiera. Antes de empezar, dime qué archivos tocarás.
+
+1. Dependencias: @dnd-kit/core, @dnd-kit/sortable, @dnd-kit/modifiers, @dnd-kit/utilities.
+
+2. Base de datos (tengo datos reales, NO los pierdas):
+   - Nueva versión de Dexie que agrega el campo indexado sortOrder a accounts.
+   - Migración con upgrade(): asigna sortOrder siguiendo el orden de visualización actual
+     (débito, crédito, efectivo).
+   - Cuentas nuevas reciben sortOrder = máximo + 1. Actualiza seed.js y el store useAccounts
+     para ordenar siempre por sortOrder.
+   - Verifica que el respaldo JSON (si ya existe) incluya sortOrder.
+
+3. Lógica pura en src/domain/accountOrder.js con pruebas en tests/accountOrder.test.js:
+   reorderAccounts(allAccounts, activeId, overId, visibleIds) devuelve la lista completa
+   con sortOrder reasignado de 0 a n−1. Si hay filtro (visibleIds es un subconjunto),
+   solo se reordenan las visibles entre las posiciones que ya ocupaban; las ocultas no se mueven.
+   Casos: mover primero al último, último al primero, vecinos, con filtro, id inexistente
+   (devuelve la lista sin cambios).
+
+4. UI en components/wallet/ (CardStack.jsx y WalletCard.jsx):
+   - DndContext con sensores: PointerSensor y TouchSensor con activationConstraint
+     { delay: 400, tolerance: 8 }, y KeyboardSensor. Modificador restrictToVerticalAxis
+     y autoScroll activado.
+   - SortableContext con verticalListSortingStrategy. Funciona en la vista apilada
+     (tarjetas encimadas) y en la vista separada, con el MISMO orden.
+   - Al activarse el arrastre: la tarjeta se levanta (escala 1.03, sombra más profunda, z-index
+     superior), con un temblor suave de 1.5° de rotación en bucle mientras está levantada,
+     y navigator.vibrate(10) si está disponible (con try/catch).
+   - Respetar prefers-reduced-motion: sin temblor, solo elevación y sombra.
+   - El toque corto sigue abriendo el detalle; un arrastre o pulsación larga NO debe abrir el
+     detalle al soltar.
+   - El scroll vertical de la pantalla debe seguir funcionando con un deslizamiento normal.
+   - Al soltar: guardar el nuevo orden con una sola transacción de Dexie y un toast
+     "Orden guardado" con opción Deshacer.
+   - Alternativa sin gestos: botones "Subir" y "Bajar" en AccountDetailModal.
+
+5. El carrusel de CardPicker en Registrar debe usar el mismo orden (sortOrder).
+
+6. Colores solo desde tokens, íconos con lucide-react, áreas táctiles de 44 px.
+
+Al terminar corre npm test, npm run build y npm run lint (0 warnings), y lista los archivos
+modificados. NO hagas commit.
+
+```
+
+```
+ Lee docs/PLAN.md, AGENTS.md y design-system/MASTER.md. Tarea: pulido de UI. No cambies lógica de dominio salvo lo indicado.
+
+1. Panorama: cuando el periodo anterior no tiene datos (total 0), no muestres "+100%";
+   muestra "Sin datos del periodo anterior". Ajusta domain/summaries.js y agrega pruebas.
+2. Mostrar siempre el tipo de cuenta ("Revolut · Crédito") en: lista de gastos fijos,
+   formularios, selectores e historial. Crea un helper en lib/format.js (accountLabel).
+3. Gastos fijos: verifica que exista forma de confirmar un gasto "pendiente" del mes.
+   Si no existe, agrégala. Íconos de editar y borrar con área táctil de 44 px; borrar con
+   confirmación. Muestra los nombres como están guardados (sin forzar mayúsculas).
+4. Registrar: deja un solo scroll en la pantalla (sin scroll anidado en categorías) y un botón
+   Guardar fijo encima de la barra inferior. Confirma que fecha y nota sean accesibles.
+5. Cuentas: deja un solo botón "Nueva cuenta". Ordena la pila: débito, crédito, efectivo.
+   Diferencia visualmente las tarjetas de crédito de las de débito de la misma marca.
+6. Tarjetas: evita que el nombre se corte ("MERCADO PAGO"). Las tarjetas no seleccionadas
+   del carrusel no deben alterar el color de marca (atenúa sin cambiar el tono).
+7. BottomNav: el anillo de foco solo con :focus-visible y con esquinas redondeadas.
+8. Revisa el contraste de textos grises secundarios; súbelos a 4.5:1 mínimo usando tokens.
+9. Gastos fijos: el botón "Pagar" debe crear el movimiento con fixedId. Un gasto fijo cuenta como
+   pagado si existe un movimiento con ese fixedId en el mes. Para los ya registrados a mano,
+   agrega la acción "Ya lo pagué" que lo marca como pagado sin crear movimiento ni modificar saldos.
+10. DonutChart: dos categorías no pueden tener el mismo color. Define una paleta de 9 tonos
+   distinguibles dentro de los tokens (naranjas, ámbar y neutros claros) o usa etiquetas directas.
+11. WalletCard: los últimos 4 dígitos no deben partirse en otra línea; el nombre no debe cortarse
+   (reduce la fuente o usa un nombre corto).
+12. creditCards.js: calcular daysToCut y daysToPay con differenceInCalendarDays de date-fns
+   (hoy da 1 día de más por comparar medianoche con mediodía). Pruebas con referencia a las
+   00:01 y a las 23:59 del mismo día.
+13. Fechas locales: ninguna función debe usar toISOString() para generar fechas de movimientos o
+   de periodo (da la fecha UTC). Usa format(date, 'yyyy-MM-dd') en hora local. Prueba: con
+   la hora local a las 21:00 en UTC-6, el formulario debe mostrar la fecha de hoy.
+14. YieldPanel de la Cajita Turbo: reemplazar la lista "Tramos y tasas" por tres renglones
+   (capital hasta el tope, intereses acumulados, capital excedente) y mostrar capital e intereses
+   por separado.
+
+
 ---
 
 ## Prompts de rescate

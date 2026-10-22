@@ -167,4 +167,50 @@ db.version(1).stores({
   settings: 'id',
 })
 
+db.version(2)
+  .stores({
+    /**
+     * Igual que v1 pero con sortOrder indexado para ordenar eficientemente.
+     * Se agrega sortOrder al índice de accounts.
+     */
+    accounts: '++id, type, currency, parentId, sortOrder',
+    movements: '++id, accountId, toAccountId, categoryId, date, type',
+    categories: '++id, type',
+    budgets: '++id, categoryId',
+    fixedExpenses: '++id, categoryId, accountId',
+    holdings: '++id, symbol, kind',
+    priceCache: 'symbol',
+    settings: 'id',
+  })
+  .upgrade(async (tx) => {
+    /**
+     * Migración v1 → v2:
+     * Asigna sortOrder a cuentas existentes siguiendo el orden de visualización:
+     *   1. Débito y ahorro (debit, savings) — por nombre
+     *   2. Crédito (credit) — por nombre
+     *   3. Efectivo (cash) — por nombre
+     * Cuentas que ya tienen sortOrder se ordenan dentro de su grupo respetando
+     * su sortOrder previo para no perder orden personalizado.
+     */
+    const accounts = await tx.table('accounts').toArray()
+
+    const GROUP_ORDER = { debit: 0, savings: 0, credit: 1, cash: 2 }
+
+    // Ordenar: primero por grupo, luego por sortOrder existente (o createdAt como fallback)
+    accounts.sort((a, b) => {
+      const ga = GROUP_ORDER[a.type] ?? 3
+      const gb = GROUP_ORDER[b.type] ?? 3
+      if (ga !== gb) return ga - gb
+      const sa = a.sortOrder ?? 999
+      const sb = b.sortOrder ?? 999
+      if (sa !== sb) return sa - sb
+      return (a.createdAt || '').localeCompare(b.createdAt || '')
+    })
+
+    // Reasignar sortOrder de 0 a n-1
+    for (let i = 0; i < accounts.length; i++) {
+      await tx.table('accounts').update(accounts[i].id, { sortOrder: i })
+    }
+  })
+
 export default db

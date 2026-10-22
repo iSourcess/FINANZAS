@@ -12,12 +12,14 @@
 import { create } from 'zustand'
 import { db } from '../db/database.js'
 import { runSeed } from '../db/seed.js'
+import { reorderAccounts as domainReorder } from '../domain/accountOrder.js'
 
 export const useAccounts = create((set, get) => ({
   accounts: [],
   loading: false,
   error: null,
   selectedAccountId: null,
+  _prevAccounts: null, // snapshot para deshacer el último reordenamiento
 
   /**
    * Carga todas las cuentas desde IndexedDB.
@@ -152,29 +154,62 @@ export const useAccounts = create((set, get) => ({
   },
 
   /**
-   * Reordena las cuentas y persiste el orden en Dexie.
-   * @param {Array<string>} orderedIds - Array de IDs en nuevo orden
+   * Reordena las cuentas a partir de un movimiento drag-and-drop.
+   * Usa la función pura domainReorder para calcular el nuevo orden y persiste
+   * todos los sortOrder en una sola transacción de Dexie.
+   *
+   * @param {string}   activeId    - ID de la cuenta arrastrada.
+   * @param {string}   overId      - ID de la cuenta sobre la que se soltó.
+   * @param {string[]|null} [visibleIds=null] - IDs visibles si hay filtro activo.
+   * @returns {Promise<boolean>} true si se guardó correctamente.
    */
-  reorderAccounts: async (orderedIds) => {
+  reorderAccounts: async (activeId, overId, visibleIds = null) => {
+    const { accounts } = get()
+    // Guardar snapshot previo para poder deshacer
+    const prevAccounts = accounts.map(a => ({ ...a }))
+
+    // Calcular nuevo orden (puro, sin efectos secundarios)
+    const reordered = domainReorder(accounts, activeId, overId, visibleIds)
+    if (!reordered) return false
+
+    // Optimistic update: actualizar UI de inmediato
+    set({ accounts: reordered })
+
+    // Persistir en una sola transacción
     try {
       await db.transaction('rw', db.accounts, async () => {
-        for (let i = 0; i < orderedIds.length; i++) {
-          await db.accounts.update(orderedIds[i], { sortOrder: i + 1 })
+        for (const acc of reordered) {
+          await db.accounts.update(acc.id, { sortOrder: acc.sortOrder })
         }
       })
+      // Guardar snapshot para undo
+      set({ _prevAccounts: prevAccounts })
+      return true
+    } catch (err) {
+      console.error('[useAccounts] Error al guardar orden:', err)
+      // Revertir optimistic update
+      set({ accounts: prevAccounts })
+      return false
+    }
+  },
 
-      set(state => {
-        const idMap = new Map(state.accounts.map(a => [a.id, a]))
-        const reordered = orderedIds
-          .map((id, idx) => {
-            const acc = idMap.get(id)
-            return acc ? { ...acc, sortOrder: idx + 1 } : null
-          })
-          .filter(Boolean)
-        return { accounts: reordered }
+  /**
+   * Deshace el último reordenamiento.
+   * Restaura el orden previo y lo persiste en Dexie.
+   */
+  undoReorder: async () => {
+    const { _prevAccounts } = get()
+    if (!_prevAccounts) return
+
+    set({ accounts: _prevAccounts, _prevAccounts: null })
+    try {
+      await db.transaction('rw', db.accounts, async () => {
+        for (const acc of _prevAccounts) {
+          await db.accounts.update(acc.id, { sortOrder: acc.sortOrder })
+        }
       })
     } catch (err) {
-      console.error('[useAccounts] Error al reordenar cuentas:', err)
+      console.error('[useAccounts] Error al deshacer orden:', err)
     }
   },
 
