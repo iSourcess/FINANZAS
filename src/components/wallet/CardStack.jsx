@@ -17,7 +17,7 @@
 import { useState, useCallback, useRef } from 'react'
 import {
   DndContext,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   KeyboardSensor,
   useSensor,
@@ -30,7 +30,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
-import { Layers, LayoutGrid, Plus, CheckCircle, RotateCcw } from 'lucide-react'
+import { Layers, LayoutGrid, Plus, CheckCircle, RotateCcw, CreditCard } from 'lucide-react'
 import WalletCard from './WalletCard.jsx'
 import Button from '../ui/Button.jsx'
 import { useAccounts } from '../../store/useAccounts.js'
@@ -86,14 +86,15 @@ export default function CardStack({
   const toastTimer = useRef(null)
 
   /* ── Sensores dnd-kit ─────────────────────────────────────── */
-  // PointerSensor y TouchSensor con delay de 400 ms y tolerancia de 8 px
-  // para distinguir toque corto (abrir detalle) de pulsación larga (drag)
+  // MouseSensor para escritorio y TouchSensor para móvil con delay de 250ms
+  // para permitir scroll vertical normal cuando se desliza rápido
+  // y activar arrastre cuando se mantiene presionado sin mover toda la página
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { delay: 400, tolerance: 8 },
+    useSensor(MouseSensor, {
+      activationConstraint: { distance: 8 },
     }),
     useSensor(TouchSensor, {
-      activationConstraint: { delay: 400, tolerance: 8 },
+      activationConstraint: { delay: 250, tolerance: 6 },
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
@@ -129,16 +130,24 @@ export default function CardStack({
   /* ── Handlers de drag ─────────────────────────────────────── */
   const handleDragStart = useCallback(() => {
     setIsDragActive(true)
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = 'hidden'
+      document.body.style.touchAction = 'none'
+    }
     // Vibrar levemente al activar el drag
     try {
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(10)
+        navigator.vibrate(15)
       }
     } catch { /* no-op si vibrate no está disponible */ }
   }, [])
 
   const handleDragEnd = useCallback(async ({ active, over }) => {
     setIsDragActive(false)
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = ''
+      document.body.style.touchAction = ''
+    }
     if (!over || active.id === over.id) return
 
     const saved = await reorderAccounts(active.id, over.id, visibleIds)
@@ -153,6 +162,10 @@ export default function CardStack({
 
   const handleDragCancel = useCallback(() => {
     setIsDragActive(false)
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = ''
+      document.body.style.touchAction = ''
+    }
   }, [])
 
   const handleUndo = useCallback(async () => {
@@ -240,8 +253,8 @@ export default function CardStack({
           </button>
         </div>
 
-        {/* Indicador de modo reordenamiento activo */}
-        {!isDragActive && (
+        {/* Indicador de modo reordenamiento activo (solo cuando hay más de 1 tarjeta) */}
+        {!isDragActive && accounts.length > 1 && (
           <p className="text-center text-xs" style={{ color: 'var(--text-muted)' }}>
             Mantén presionada una tarjeta para reordenar
           </p>
@@ -250,16 +263,26 @@ export default function CardStack({
         {/* ── Visualización de las Tarjetas ── */}
         {sortedAccounts.length === 0 ? (
           <div
-            className="rounded-2xl p-8 text-center flex flex-col items-center justify-center gap-3"
+            className="rounded-2xl p-8 sm:p-10 text-center flex flex-col items-center justify-center gap-3.5 my-2"
             style={{
               background: 'var(--bg-surface)',
               border: '1px dashed var(--border-default)',
-              color: 'var(--text-muted)',
             }}
           >
-            <p className="text-sm">No hay tarjetas registradas en esta vista.</p>
-            <Button size="sm" variant="primary" icon={Plus} onClick={onAddNew}>
-              Agregar primera cuenta
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center"
+              style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
+            >
+              <CreditCard size={26} className="text-[var(--orange-400)]" />
+            </div>
+            <div className="flex flex-col gap-1 max-w-xs">
+              <p className="text-sm font-semibold text-white">Tu billetera está vacía</p>
+              <p className="text-xs text-[var(--text-muted)]">
+                Agrega manualmente tus tarjetas de débito, crédito o cuentas de ahorro para comenzar.
+              </p>
+            </div>
+            <Button size="md" variant="primary" icon={Plus} onClick={onAddNew} className="mt-1">
+              Agregar primera tarjeta
             </Button>
           </div>
         ) : isExpanded ? (

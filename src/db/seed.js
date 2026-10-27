@@ -283,26 +283,27 @@ const INITIAL_SETTINGS = {
  */
 export async function runSeed() {
   try {
-    const [accountCount, categoryCount] = await Promise.all([
-      db.accounts.count(),
-      db.categories.count(),
-    ])
+    const categoryCount = await db.categories.count()
 
-    // Si ya hay datos, no hacer nada
-    if (accountCount > 0 || categoryCount > 0) return
+    // Si ya hay categorías, solo aseguramos settings si faltan
+    if (categoryCount > 0) {
+      const existingSettings = await db.settings.get('global')
+      if (!existingSettings) {
+        await db.settings.add(INITIAL_SETTINGS)
+      }
+      return
+    }
 
-    // Insertar todo en una transacción para consistencia
+    // Insertar categorías y configuración inicial (cuentas inician vacías para agregar manualmente)
     await db.transaction(
       'rw',
-      [db.categories, db.accounts, db.settings],
+      [db.categories, db.settings],
       async () => {
         await db.categories.bulkAdd([
           ...EXPENSE_CATEGORIES,
           ...INCOME_CATEGORIES,
         ])
-        await db.accounts.bulkAdd(SEED_ACCOUNTS)
 
-        // Solo inserta settings si no existe
         const existingSettings = await db.settings.get('global')
         if (!existingSettings) {
           await db.settings.add(INITIAL_SETTINGS)
@@ -310,7 +311,7 @@ export async function runSeed() {
       }
     )
 
-    console.info('[seed] Base de datos inicializada correctamente.')
+    console.info('[seed] Categorías y configuración inicializadas correctamente. Cuentas limpias.')
   } catch (error) {
     // No romper la app si el seed falla (p. ej. IndexedDB no disponible)
     console.error('[seed] Error al inicializar la base de datos:', error)

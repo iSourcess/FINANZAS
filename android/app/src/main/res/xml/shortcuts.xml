@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Atajo 1: Registrar gasto -->
+    <shortcut
+        android:shortcutId="registrar_gasto"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_expense"
+        android:shortcutShortLabel="@string/shortcut_expense_short"
+        android:shortcutLongLabel="@string/shortcut_expense_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.finanzas.app"
+            android:targetClass="com.finanzas.app.MainActivity"
+            android:data="finanzas://registrar?type=expense" />
+    </shortcut>
+
+    <!-- Atajo 2: Registrar ingreso -->
+    <shortcut
+        android:shortcutId="registrar_ingreso"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_income"
+        android:shortcutShortLabel="@string/shortcut_income_short"
+        android:shortcutLongLabel="@string/shortcut_income_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.finanzas.app"
+            android:targetClass="com.finanzas.app.MainActivity"
+            android:data="finanzas://registrar?type=income" />
+    </shortcut>
+
+    <!-- Atajo 3: Ver Panorama -->
+    <shortcut
+        android:shortcutId="ver_panorama"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_overview"
+        android:shortcutShortLabel="@string/shortcut_overview_short"
+        android:shortcutLongLabel="@string/shortcut_overview_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.finanzas.app"
+            android:targetClass="com.finanzas.app.MainActivity"
+            android:data="finanzas://panorama" />
+    </shortcut>
+</shortcuts>

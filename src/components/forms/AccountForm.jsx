@@ -14,6 +14,7 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   Plus,
   Trash2,
+  ShieldAlert,
   Sparkles,
   Check,
   ChevronDown,
@@ -40,8 +41,10 @@ export default function AccountForm({
   isOpen,
   onClose,
   onSave,
+  onDelete = null,
 }) {
   const isEditing = Boolean(account?.id)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   // Estado del formulario
   const [name, setName] = useState('')
@@ -734,14 +737,50 @@ export default function AccountForm({
           </div>
         )}
 
-        {/* ── Botones de Guardar / Cancelar ── */}
-        <div className="flex items-center justify-end gap-3 pt-3 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
-          <Button variant="ghost" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button variant="primary" type="submit">
-            {isEditing ? 'Guardar cambios' : 'Crear cuenta'}
-          </Button>
+        {/* ── Botones de Guardar / Cancelar / Eliminar ── */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+          {isEditing && onDelete ? (
+            <Button
+              type="button"
+              variant={confirmDelete ? 'danger' : 'secondary'}
+              size="sm"
+              className="w-full sm:w-auto font-medium"
+              style={{
+                borderColor: confirmDelete ? 'var(--red-500)' : 'rgba(239, 68, 68, 0.4)',
+                background: confirmDelete ? 'var(--red-900)' : 'rgba(239, 68, 68, 0.08)',
+                color: 'var(--red-400)',
+                minHeight: '40px',
+              }}
+              icon={confirmDelete ? ShieldAlert : Trash2}
+              onClick={() => {
+                if (confirmDelete) {
+                  onDelete(account.id)
+                } else {
+                  setConfirmDelete(true)
+                }
+              }}
+            >
+              {confirmDelete ? '¿Confirmar eliminación?' : 'Eliminar cuenta'}
+            </Button>
+          ) : <div className="hidden sm:block" />}
+
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <Button
+              variant="ghost"
+              type="button"
+              className="flex-1 sm:flex-none"
+              onClick={onClose}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              type="submit"
+              className="flex-1 sm:flex-none"
+            >
+              {isEditing ? 'Guardar cambios' : 'Crear cuenta'}
+            </Button>
+          </div>
         </div>
       </form>
     </Modal>

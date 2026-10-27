@@ -6,17 +6,24 @@ import Overview from './pages/Overview/index.jsx'
 import Accounts from './pages/Accounts/index.jsx'
 import Settings from './pages/Settings/index.jsx'
 import { setupNotificationNavigationListener, rescheduleAll } from './services/notifications.js'
+import { setupDeepLinkListener } from './services/deeplinks.js'
 
 /**
- * Inicializador de recordatorios y navegación por notificaciones.
+ * Inicializador de recordatorios, deep links y navegación.
  */
 function AppNotificationInitializer() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    let cleanup = null
+    let cleanupNotif = null
+    let cleanupDeepLink = null
+
     setupNotificationNavigationListener(navigate).then((fn) => {
-      cleanup = fn
+      cleanupNotif = fn
+    })
+
+    setupDeepLinkListener(navigate).then((fn) => {
+      cleanupDeepLink = fn
     })
 
     rescheduleAll().catch((err) => {
@@ -24,7 +31,8 @@ function AppNotificationInitializer() {
     })
 
     return () => {
-      if (typeof cleanup === 'function') cleanup()
+      if (typeof cleanupNotif === 'function') cleanupNotif()
+      if (typeof cleanupDeepLink === 'function') cleanupDeepLink()
     }
   }, [navigate])
 

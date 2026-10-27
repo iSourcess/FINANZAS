@@ -123,6 +123,7 @@ export default function WalletCard({
           : dragScale,
         zIndex: isDragging ? 999 : undefined,
         WebkitTapHighlightColor: 'transparent',
+        touchAction: isDragging ? 'none' : (sortable ? 'manipulation' : 'auto'),
       }}
     >
       {/* ── Fila Superior: Nombre y Tipo ── */}

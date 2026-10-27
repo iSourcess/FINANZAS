@@ -22,7 +22,45 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Deep link: finanzas:// -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="finanzas" />
+            </intent-filter>
+
+            <!-- Atajos estáticos al mantener pulsado el ícono -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+
         </activity>
+
+        <!-- Servicio de Mosaico en el Panel de Ajustes Rápidos (Quick Settings Tile) -->
+        <service
+            android:name=".QuickRegisterTileService"
+            android:label="@string/tile_quick_expense"
+            android:icon="@drawable/ic_shortcut_expense"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Receptor del Widget de la Pantalla de Inicio -->
+        <receiver
+            android:name=".FinanceCardWidgetProvider"
+            android:label="@string/widget_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_card_info" />
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"

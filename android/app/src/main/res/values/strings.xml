@@ -4,4 +4,18 @@
     <string name="title_activity_main">Finanzas</string>
     <string name="package_name">com.finanzas.app</string>
     <string name="custom_url_scheme">com.finanzas.app</string>
+    <string name="tile_quick_expense">Registrar gasto</string>
+    <string name="shortcut_expense_short">Registrar gasto</string>
+    <string name="shortcut_expense_long">Registrar un gasto rápido</string>
+    <string name="shortcut_income_short">Registrar ingreso</string>
+    <string name="shortcut_income_long">Registrar un ingreso rápido</string>
+    <string name="shortcut_overview_short">Ver Panorama</string>
+    <string name="shortcut_overview_long">Ver balance y métricas</string>
+    <string name="widget_name">Tarjeta Finanzas</string>
+    <string name="widget_description">Acceso rápido a registrar gastos e ingresos, con balance mensual y gastos de hoy.</string>
+    <string name="widget_spent_today">Gastado hoy</string>
+    <string name="widget_month_balance">Balance del mes</string>
+    <string name="widget_tap_to_register">Toca para registrar</string>
+    <string name="widget_btn_expense">+ Gasto</string>
+    <string name="widget_btn_income">+ Ingreso</string>
 </resources>

@@ -25,6 +25,7 @@ export const useSettings = create((set, get) => ({
     finnhubApiKey: '',
     templateTapBehavior: 'fill', // 'fill' | 'instant'
     includeDebtsInNetWorth: false,
+    showAmountsOnWidget: false,
     reminders: { ...DEFAULT_REMINDER_SETTINGS },
   },
   loading: false,
@@ -47,6 +48,7 @@ export const useSettings = create((set, get) => ({
           finnhubApiKey: '',
           templateTapBehavior: 'fill',
           includeDebtsInNetWorth: false,
+          showAmountsOnWidget: false,
           reminders: { ...DEFAULT_REMINDER_SETTINGS },
         }
         await db.settings.put(current)
@@ -59,6 +61,9 @@ export const useSettings = create((set, get) => ({
         if (!current.templateTapBehavior) current.templateTapBehavior = 'fill'
         if (typeof current.includeDebtsInNetWorth !== 'boolean') {
           current.includeDebtsInNetWorth = false
+        }
+        if (typeof current.showAmountsOnWidget !== 'boolean') {
+          current.showAmountsOnWidget = false
         }
         if (!current.reminders) {
           current.reminders = { ...DEFAULT_REMINDER_SETTINGS }
@@ -116,6 +121,10 @@ export const useSettings = create((set, get) => ({
 
   setIncludeDebtsInNetWorth: async (enabled) => {
     return get().updateSettings({ includeDebtsInNetWorth: Boolean(enabled) })
+  },
+
+  setShowAmountsOnWidget: async (enabled) => {
+    return get().updateSettings({ showAmountsOnWidget: Boolean(enabled) })
   },
 
   updateReminderSettings: async (reminderUpdates) => {

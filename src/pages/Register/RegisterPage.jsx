@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useState, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Edit2,
   Trash2,
@@ -98,12 +99,34 @@ export default function RegisterPage() {
   const [toastAction, setToastAction] = useState(null)
   const [toastUndo, setToastUndo] = useState(null)
 
+  const [searchParams] = useSearchParams()
+
   useEffect(() => {
     fetchMovements()
     fetchAccounts()
     fetchTemplates()
     fetchSettings()
   }, [fetchMovements, fetchAccounts, fetchTemplates, fetchSettings])
+
+  // Pre-seleccionar tipo de movimiento si se abrió mediante deep link (ej: finanzas://registrar?type=expense)
+  useEffect(() => {
+    const rawType = searchParams.get('type')
+    if (rawType) {
+      const typeLower = rawType.toLowerCase()
+      let resolvedType = null
+      if (typeLower === 'expense' || typeLower === 'gasto') resolvedType = 'expense'
+      else if (typeLower === 'income' || typeLower === 'ingreso') resolvedType = 'income'
+      else if (typeLower === 'transfer' || typeLower === 'transferencia') resolvedType = 'transfer'
+
+      if (resolvedType) {
+        setFormDraftMovement((prev) => ({
+          ...(prev || {}),
+          type: resolvedType,
+        }))
+        setFormKey((k) => k + 1)
+      }
+    }
+  }, [searchParams])
 
   // Filtrar movimientos del día de hoy (fecha en hora local)
   const todayStr = useMemo(() => todayLocalISO(), [])

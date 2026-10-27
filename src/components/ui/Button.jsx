@@ -14,6 +14,7 @@ export default function Button({
   onClick,
   className = '',
   icon: Icon,
+  style = {},
   ...props
 }) {
   const baseStyles = {
@@ -22,7 +23,7 @@ export default function Button({
     justifyContent: 'center',
     gap: '8px',
     fontFamily: "'DM Sans', sans-serif",
-    fontWeight: 500,
+    fontWeight: variant === 'primary' ? 600 : 500,
     borderRadius: 'var(--radius-md)',
     cursor: disabled ? 'not-allowed' : 'pointer',
     transition: 'all var(--transition-micro)',
@@ -57,8 +58,8 @@ export default function Button({
   const variantStyles = {
     primary: {
       background: 'var(--orange-400)',
-      color: 'var(--text-inverse)',
-      boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+      color: '#0A0A0A',
+      boxShadow: '0 2px 8px rgba(255, 122, 26, 0.35)',
     },
     secondary: {
       background: 'var(--bg-surface)',
@@ -85,6 +86,7 @@ export default function Button({
         ...baseStyles,
         ...sizeStyles,
         ...variantStyles,
+        ...style,
       }}
       className={`active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] ${className}`}
       {...props}

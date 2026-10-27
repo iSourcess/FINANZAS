@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState, useMemo } from 'react'
-import { Plus, Wallet, TrendingUp, TrendingDown, ShieldCheck, CandlestickChart, HandCoins } from 'lucide-react'
+import { Plus, Wallet, TrendingUp, TrendingDown, ShieldCheck, CandlestickChart, HandCoins, FileSpreadsheet } from 'lucide-react'
 import { useAccounts } from '../../store/useAccounts.js'
 import { useMovements } from '../../store/useMovements.js'
 import { useInvestments } from '../../store/useInvestments.js'
@@ -24,8 +24,10 @@ import HoldingsList from '../../components/investments/HoldingsList.jsx'
 import DebtsSection from '../../components/debts/DebtsSection.jsx'
 import DebtFormModal from '../../components/debts/DebtFormModal.jsx'
 import DebtPaymentModal from '../../components/debts/DebtPaymentModal.jsx'
+import CsvImportModal from '../../components/imports/CsvImportModal.jsx'
 import Modal from '../../components/ui/Modal.jsx'
 import Button from '../../components/ui/Button.jsx'
+import Toast from '../../components/ui/Toast.jsx'
 import { calculateNetWorth } from '../../domain/netWorth.js'
 import { calculateDebtsSummary } from '../../domain/debts.js'
 import { formatMoney } from '../../lib/format.js'
@@ -84,8 +86,12 @@ export default function AccountsPage() {
   const [editingDebt, setEditingDebt] = useState(null)
   const [payingDebt, setPayingDebt] = useState(null)
 
-  const { addMovement } = useMovements()
+  const { addMovement, categories, fetchMovements } = useMovements()
 
+  // Modal de importación CSV
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [importPreselectedAccountId, setImportPreselectedAccountId] = useState(null)
+  const [toastMessage, setToastMessage] = useState('')
   // Cargar cuentas, inversiones, deudas y ajustes de Dexie al montar
   useEffect(() => {
     fetchAccounts()
@@ -170,14 +176,29 @@ export default function AccountsPage() {
         </div>
 
         {activeTab === 'wallet' && (
-          <Button
-            variant="primary"
-            size="sm"
-            icon={Plus}
-            onClick={handleOpenCreate}
-          >
-            Nueva cuenta
-          </Button>
+          <div className="flex items-center gap-2">
+            {accounts.length > 0 && (
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={FileSpreadsheet}
+                onClick={() => {
+                  setImportPreselectedAccountId(null)
+                  setIsImportModalOpen(true)
+                }}
+              >
+                Importar CSV
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Plus}
+              onClick={handleOpenCreate}
+            >
+              Nueva cuenta
+            </Button>
+          </div>
         )}
 
         {activeTab === 'debts' && (
@@ -492,6 +513,11 @@ export default function AccountsPage() {
           setPayingCard(acc)
         }}
         onAddCaja={handleOpenAddCaja}
+        onImportCsv={(acc) => {
+          setSelectedAccount(null)
+          setImportPreselectedAccountId(acc.id)
+          setIsImportModalOpen(true)
+        }}
       />
 
       {/* ── Modal para Pagar Tarjeta (Transferencia desde Débito) ── */}
@@ -532,6 +558,12 @@ export default function AccountsPage() {
           setSelectedParentId(null)
         }}
         onSave={handleSaveAccount}
+        onDelete={async (id) => {
+          await deleteAccount(id)
+          setIsFormOpen(false)
+          setEditingAccount(null)
+          setSelectedParentId(null)
+        }}
       />
 
       {/* ── Modal de Deuda (Crear / Editar) ── */}
@@ -565,6 +597,31 @@ export default function AccountsPage() {
           }
         }}
       />
+
+      {/* ── Modal de Importación CSV de Estado de Cuenta ── */}
+      <CsvImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => {
+          setIsImportModalOpen(false)
+          setImportPreselectedAccountId(null)
+        }}
+        accounts={accounts}
+        categories={categories}
+        initialAccountId={importPreselectedAccountId}
+        onSuccess={(msg) => {
+          setToastMessage(msg)
+          fetchAccounts()
+          fetchMovements()
+        }}
+      />
+
+      {/* ── Toast de confirmación ── */}
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          onClose={() => setToastMessage('')}
+        />
+      )}
     </div>
   )
 }

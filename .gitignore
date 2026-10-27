@@ -50,10 +50,12 @@ src-tauri/target/
 Thumbs.db
 *.swp
 
-# Respaldos de datos personales (nunca subir tus finanzas)
+# Respaldos de datos personales y estados de cuenta (nunca subir tus finanzas)
 backups/
+imports/
 *.backup.json
-mis-movimientos*.csv
+*.csv
+!tests/fixtures/*.csv
 
 # Scripts temporales
 scaffold.mjs

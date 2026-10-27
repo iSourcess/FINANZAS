@@ -32,7 +32,7 @@ export default function Modal({
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{
         background: 'rgba(0, 0, 0, 0.75)',
         backdropFilter: 'blur(4px)',
@@ -47,6 +47,7 @@ export default function Modal({
         style={{
           background: 'var(--bg-surface)',
           border: '1px solid var(--border-default)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         }}
       >
         {/* Header */}
@@ -87,7 +88,7 @@ export default function Modal({
         </div>
 
         {/* Content body */}
-        <div className="p-5 overflow-y-auto flex-1">
+        <div className="p-5 pb-8 sm:pb-5 overflow-y-auto flex-1">
           {children}
         </div>
       </div>

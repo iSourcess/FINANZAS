@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_background"
+    android:padding="12dp">
+
+    <!-- Fila superior: Logo y Título -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:src="@drawable/ic_shortcut_expense"
+            android:contentDescription="@string/app_name" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:text="@string/app_name"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_text_privacy_hint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/widget_tap_to_register"
+            android:textColor="#888888"
+            android:textSize="10sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Fila central: Métricas de Hoy y Balance del Mes -->
+    <LinearLayout
+        android:id="@+id/widget_metrics_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp">
+
+        <!-- Columna 1: Gastado hoy -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/widget_spent_today"
+                android:textColor="#9E9E9E"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/widget_text_spent_today"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="••••"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Columna 2: Balance del mes -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/widget_month_balance"
+                android:textColor="#9E9E9E"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/widget_text_month_balance"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="••••"
+                android:textColor="#FF7A1A"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Fila inferior: Botones de captura rápida -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginTop="2dp">
+
+        <!-- Botón + Gasto -->
+        <TextView
+            android:id="@+id/widget_btn_expense"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/widget_button_orange"
+            android:gravity="center"
+            android:text="@string/widget_btn_expense"
+            android:textColor="#0A0A0A"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <!-- Botón + Ingreso -->
+        <TextView
+            android:id="@+id/widget_btn_income"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/widget_button_surface"
+            android:gravity="center"
+            android:text="@string/widget_btn_income"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+</LinearLayout>

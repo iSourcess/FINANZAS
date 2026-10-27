@@ -41,6 +41,11 @@ import {
   ToggleRight,
   HandCoins,
   TrendingUp,
+  RotateCcw,
+  SlidersHorizontal,
+  Smartphone,
+  Info,
+  LayoutGrid,
 } from 'lucide-react'
 import { AVAILABLE_FX_PAIRS } from '../../lib/constants.js'
 import { useFx } from '../../store/useFx.js'
@@ -53,9 +58,11 @@ import { useInvestments } from '../../store/useInvestments.js'
 import { useRecurringIncomes } from '../../store/useRecurringIncomes.js'
 import { validateTemplate } from '../../domain/templates.js'
 import { DEFAULT_REMINDER_SETTINGS } from '../../domain/reminders.js'
+import { useImports } from '../../store/useImports.js'
 import TemplateFormModal from '../../components/forms/TemplateFormModal.jsx'
 import RecurringIncomeModal from '../../components/forms/RecurringIncomeModal.jsx'
 import NotificationPermissionModal from '../../components/notifications/NotificationPermissionModal.jsx'
+import CsvImportModal from '../../components/imports/CsvImportModal.jsx'
 import { toISODate } from '../../domain/periods.js'
 import {
   exportDatabaseToJSON,
@@ -69,6 +76,8 @@ import {
   checkNotificationPermissions,
   scheduleFinancialReminders,
 } from '../../services/notifications.js'
+import { requestAddQuickSettingsTile, isQuickSettingsTileSupported } from '../../services/deeplinks.js'
+import { requestPinHomeScreenWidget } from '../../services/widget.js'
 import Button from '../../components/ui/Button.jsx'
 import Modal from '../../components/ui/Modal.jsx'
 import { formatMoney, centsToInput, inputToCents, formatDate, accountLabel } from '../../lib/format.js'
@@ -88,8 +97,8 @@ export default function SettingsPage() {
     toggleFixedExpense,
   } = useBudgets()
 
-  const { categories, fetchMovements } = useMovements()
-  const { accounts, fetchAccounts } = useAccounts()
+  const { movements, categories, fetchMovements } = useMovements()
+  const { accounts, fetchAccounts, clearAllAccounts } = useAccounts()
   const {
     settings,
     fetchSettings,
@@ -97,6 +106,7 @@ export default function SettingsPage() {
     setFxSettings,
     setTemplateTapBehavior,
     setIncludeDebtsInNetWorth,
+    setShowAmountsOnWidget,
     updateReminderSettings,
   } = useSettings()
   const {
@@ -120,12 +130,63 @@ export default function SettingsPage() {
     toggleRecurringIncome,
   } = useRecurringIncomes()
 
-  const [activeTab, setActiveTab] = useState('budgets') // 'budgets' | 'fixed' | 'incomes' | 'templates' | 'reminders' | 'fx' | 'backup'
+  const { batches, fetchBatches, revertBatch, loading: loadingBatches } = useImports()
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+
+  const [activeTab, setActiveTab] = useState('budgets') // 'budgets' | 'fixed' | 'incomes' | 'templates' | 'reminders' | 'fx' | 'backup' | 'imports'
 
   // Estados de recordatorios y permisos
   const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false)
   const [permissionStatus, setPermissionStatus] = useState('prompt')
   const [isSendingTestNotif, setIsSendingTestNotif] = useState(false)
+
+  // Estado para Quick Settings Tile y Atajos
+  const [isTileLoading, setIsTileLoading] = useState(false)
+  const [showManualTileSteps, setShowManualTileSteps] = useState(false)
+  const [tileStatusMsg, setTileStatusMsg] = useState('')
+
+  const handleRequestTile = async () => {
+    setIsTileLoading(true)
+    setTileStatusMsg('')
+    try {
+      const res = await requestAddQuickSettingsTile()
+      if (res.success) {
+        setTileStatusMsg('Solicitud enviada al sistema operativo. Confirma en el cuadro emergente.')
+      } else {
+        setShowManualTileSteps(true)
+        setTileStatusMsg(res.message || 'Sigue los pasos para agregarlo manualmente.')
+      }
+    } catch {
+      setShowManualTileSteps(true)
+      setTileStatusMsg('Sigue los pasos para agregarlo manualmente.')
+    } finally {
+      setIsTileLoading(false)
+    }
+  }
+
+  // Estado para Widget de Inicio (AppWidget)
+  const [isPinLoading, setIsPinLoading] = useState(false)
+  const [showManualWidgetSteps, setShowManualWidgetSteps] = useState(false)
+  const [widgetStatusMsg, setWidgetStatusMsg] = useState('')
+
+  const handlePinWidget = async () => {
+    setIsPinLoading(true)
+    setWidgetStatusMsg('')
+    try {
+      const res = await requestPinHomeScreenWidget()
+      if (res.success) {
+        setWidgetStatusMsg('Solicitud enviada al launcher. Revisa tu pantalla de inicio.')
+      } else {
+        setShowManualWidgetSteps(true)
+        setWidgetStatusMsg(res.message || 'Sigue los pasos para agregarlo manualmente.')
+      }
+    } catch {
+      setShowManualWidgetSteps(true)
+      setWidgetStatusMsg('Sigue los pasos para agregarlo manualmente.')
+    } finally {
+      setIsPinLoading(false)
+    }
+  }
 
   useEffect(() => {
     checkNotificationPermissions().then(setPermissionStatus)
@@ -176,6 +237,7 @@ export default function SettingsPage() {
     fetchAccounts()
     fetchTemplates()
     fetchRecurringIncomes()
+    fetchBatches()
     fetchSettings().then((s) => {
       if (s) {
         setFinnhubInput(s.finnhubApiKey || '')
@@ -494,7 +556,7 @@ export default function SettingsPage() {
       {/* ── Contenido Principal ── */}
       <main className="p-4 sm:p-6 max-w-2xl mx-auto w-full flex flex-col gap-5 flex-1">
         {/* Selector de Sección */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-1.5 p-1 rounded-xl" style={{ background: 'var(--bg-elevated)' }}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-1.5 p-1 rounded-xl" style={{ background: 'var(--bg-elevated)' }}>
           <button
             type="button"
             onClick={() => setActiveTab('budgets')}
@@ -578,6 +640,18 @@ export default function SettingsPage() {
           >
             <Archive size={14} />
             <span>Respaldo</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('imports')}
+            className={`py-2 px-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-all ${
+              activeTab === 'imports'
+                ? 'bg-[var(--bg-surface)] text-[var(--orange-400)] shadow-sm'
+                : 'text-[var(--text-secondary)] hover:text-white'
+            }`}
+          >
+            <FileSpreadsheet size={14} />
+            <span>Importar</span>
           </button>
         </div>
 
@@ -1765,6 +1839,36 @@ export default function SettingsPage() {
                   </label>
                 </div>
               </div>
+
+              {/* Limpiar cuentas para iniciar desde cero */}
+              {accounts.length > 0 && (
+                <div
+                  className="p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t"
+                  style={{ borderColor: 'var(--border-subtle)' }}
+                >
+                  <div>
+                    <span className="font-semibold text-xs text-[var(--red-400)] block">Limpiar tarjetas actuales</span>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      Elimina las {accounts.length} tarjetas registradas para dejar la billetera vacía y agregarlas manualmente.
+                    </p>
+                  </div>
+
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    icon={Trash2}
+                    onClick={async () => {
+                      if (window.confirm('¿Seguro que deseas eliminar todas las tarjetas registradas? La billetera quedará en blanco para que las agregues manualmente.')) {
+                        await clearAllAccounts()
+                        setSaveSuccessMsg('Todas las tarjetas han sido eliminadas. Billetera vacía.')
+                        setTimeout(() => setSaveSuccessMsg(''), 3000)
+                      }
+                    }}
+                  >
+                    Eliminar todas las tarjetas
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1951,6 +2055,436 @@ export default function SettingsPage() {
                 onToggle={() => handleToggleReminder('weeklyBackup')}
                 onChangeTime={(t) => handleChangeReminderTime('weeklyBackup', t)}
               />
+            </div>
+
+            {/* ── Mosaico de Ajustes Rápidos (Quick Settings Tile) y Atajos ── */}
+            <div
+              className="p-4 rounded-xl flex flex-col gap-3.5"
+              style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+              }}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+                    style={{
+                      background: 'var(--orange-900)',
+                      border: '1px solid var(--border-subtle)',
+                      color: 'var(--orange-400)',
+                    }}
+                  >
+                    <SlidersHorizontal size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white">Panel de Ajustes Rápidos</span>
+                      <span
+                        className="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                        style={{
+                          background: 'var(--orange-900)',
+                          color: 'var(--orange-400)',
+                        }}
+                      >
+                        Android
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5 leading-relaxed">
+                      Agrega el botón <strong>"Registrar gasto"</strong> a la cortina superior de tu celular para registrar compras en un solo toque desde cualquier app.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-center flex-shrink-0">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    icon={Plus}
+                    onClick={handleRequestTile}
+                    disabled={isTileLoading}
+                  >
+                    {isTileLoading ? 'Solicitando...' : 'Agregar al panel'}
+                  </Button>
+                </div>
+              </div>
+
+              {tileStatusMsg && (
+                <div
+                  className="p-2.5 rounded-lg flex items-center gap-2 text-xs font-mono"
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-subtle)',
+                    color: 'var(--orange-400)',
+                  }}
+                >
+                  <Info size={14} className="flex-shrink-0" />
+                  <span>{tileStatusMsg}</span>
+                </div>
+              )}
+
+              {/* Botón para ver/ocultar instrucciones manuales */}
+              <div className="pt-2 border-t flex flex-col gap-2" style={{ borderColor: 'var(--border-subtle)' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowManualTileSteps(!showManualTileSteps)}
+                  className="text-xs font-semibold text-[var(--orange-400)] hover:underline flex items-center gap-1.5 self-start cursor-pointer py-1"
+                  style={{ minHeight: '44px' }}
+                >
+                  <Info size={14} />
+                  <span>{showManualTileSteps ? 'Ocultar pasos manuales' : '¿Cómo agregarlo manualmente si tu Android no lo añade?'}</span>
+                </button>
+
+                {showManualTileSteps && (
+                  <div
+                    className="p-3.5 rounded-xl text-xs flex flex-col gap-2 leading-relaxed"
+                    style={{
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border-subtle)',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    <span className="font-bold text-white text-[13px]">Pasos para agregar el mosaico a mano:</span>
+                    <ol className="list-decimal list-inside space-y-1.5 text-white/90">
+                      <li>Desliza la barra de notificaciones hacia abajo dos veces para desplegar todos los ajustes rápidos.</li>
+                      <li>Toca el ícono del <strong>lápiz (Editar)</strong> o los tres puntos en la esquina superior.</li>
+                      <li>En la sección de mosaicos disponibles abajo, busca el ícono de <strong>Finanzas: "Registrar gasto"</strong>.</li>
+                      <li>Mantén presionado y arrástralo hacia arriba entre tus ajustes activos.</li>
+                    </ol>
+                  </div>
+                )}
+              </div>
+
+              {/* Información sobre atajos estáticos del ícono */}
+              <div
+                className="p-3 rounded-xl flex items-start gap-2.5 text-xs mt-0.5"
+                style={{
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-subtle)',
+                }}
+              >
+                <Smartphone size={16} className="text-[var(--orange-400)] flex-shrink-0 mt-0.5" />
+                <div className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                  <strong className="text-white block font-medium mb-0.5">Atajos al mantener presionado el ícono:</strong>
+                  Mantén pulsado el ícono de Finanzas en tu pantalla de inicio para acceder directamente a <strong>"Registrar gasto"</strong>, <strong>"Registrar ingreso"</strong> o <strong>"Ver Panorama"</strong>.
+                </div>
+              </div>
+            </div>
+
+            {/* ── Widget para la Pantalla de Inicio (AppWidget) ── */}
+            <div
+              className="p-4 rounded-xl flex flex-col gap-3.5 mt-1"
+              style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+              }}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+                    style={{
+                      background: 'var(--orange-900)',
+                      border: '1px solid var(--border-subtle)',
+                      color: 'var(--orange-400)',
+                    }}
+                  >
+                    <LayoutGrid size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white">Widget de Pantalla de Inicio</span>
+                      <span
+                        className="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                        style={{
+                          background: 'var(--orange-900)',
+                          color: 'var(--orange-400)',
+                        }}
+                      >
+                        2x1
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5 leading-relaxed">
+                      Tarjeta en tu pantalla principal con botones <strong>+ Gasto</strong> y <strong>+ Ingreso</strong>, balance mensual y total gastado hoy.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-center flex-shrink-0">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    icon={Plus}
+                    onClick={handlePinWidget}
+                    disabled={isPinLoading}
+                  >
+                    {isPinLoading ? 'Anclando...' : 'Agregar a pantalla'}
+                  </Button>
+                </div>
+              </div>
+
+              {widgetStatusMsg && (
+                <div
+                  className="p-2.5 rounded-lg flex items-center gap-2 text-xs font-mono"
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-subtle)',
+                    color: 'var(--orange-400)',
+                  }}
+                >
+                  <Info size={14} className="flex-shrink-0" />
+                  <span>{widgetStatusMsg}</span>
+                </div>
+              )}
+
+              {/* Toggle de Privacidad: Mostrar montos en el widget */}
+              <div
+                className="p-3.5 rounded-xl flex items-center justify-between gap-3"
+                style={{
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-subtle)',
+                }}
+              >
+                <div>
+                  <span className="font-bold text-xs text-white block">Mostrar montos en el widget</span>
+                  <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 leading-relaxed">
+                    Si está apagado, el widget solo mostrará los botones de captura y ocultará las cifras con <strong>••••</strong> para no exponer tus saldos sin desbloquear el celular.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={Boolean(settings?.showAmountsOnWidget)}
+                  onClick={async () => {
+                    const nextVal = !settings?.showAmountsOnWidget
+                    await setShowAmountsOnWidget(nextVal)
+                    import('../../services/widget.js').then(({ syncWidgetSnapshot }) => {
+                      syncWidgetSnapshot({
+                        movements,
+                        settings: { ...settings, showAmountsOnWidget: nextVal },
+                      }).catch(() => {})
+                    })
+                  }}
+                  className="flex items-center justify-center p-2 text-[var(--text-muted)] hover:text-white transition-colors flex-shrink-0 cursor-pointer"
+                  style={{ minWidth: '44px', minHeight: '44px' }}
+                  aria-label="Alternar mostrar montos en widget"
+                >
+                  {settings?.showAmountsOnWidget ? (
+                    <ToggleRight size={28} className="text-[var(--orange-400)]" />
+                  ) : (
+                    <ToggleLeft size={28} className="text-[var(--text-muted)]" />
+                  )}
+                </button>
+              </div>
+
+              {/* Botón para ver/ocultar instrucciones manuales */}
+              <div className="pt-2 border-t flex flex-col gap-2" style={{ borderColor: 'var(--border-subtle)' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowManualWidgetSteps(!showManualWidgetSteps)}
+                  className="text-xs font-semibold text-[var(--orange-400)] hover:underline flex items-center gap-1.5 self-start cursor-pointer py-1"
+                  style={{ minHeight: '44px' }}
+                >
+                  <Info size={14} />
+                  <span>{showManualWidgetSteps ? 'Ocultar pasos manuales' : '¿Cómo agregar el widget manualmente?'}</span>
+                </button>
+
+                {showManualWidgetSteps && (
+                  <div
+                    className="p-3.5 rounded-xl text-xs flex flex-col gap-2 leading-relaxed"
+                    style={{
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border-subtle)',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    <span className="font-bold text-white text-[13px]">Pasos para agregar el widget manualmente:</span>
+                    <ol className="list-decimal list-inside space-y-1.5 text-white/90">
+                      <li>Ve a tu pantalla de inicio y mantén presionado cualquier espacio vacío.</li>
+                      <li>Toca la opción <strong>Widgets</strong> en el menú emergente.</li>
+                      <li>Busca <strong>Finanzas</strong> en la lista de aplicaciones.</li>
+                      <li>Mantén presionada la <strong>Tarjeta Finanzas</strong> y arrástrala a la posición que desees.</li>
+                      <li>Puedes redimensionarlo horizontalmente para adaptarlo al ancho de tu pantalla.</li>
+                    </ol>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── SECCIÓN: IMPORTACIONES CSV ── */}
+        {activeTab === 'imports' && (
+          <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+            {saveSuccessMsg && (
+              <div
+                className="p-3 rounded-xl flex items-center gap-2 text-xs"
+                style={{
+                  background: 'var(--orange-900)',
+                  color: 'var(--orange-400)',
+                  border: '1px solid var(--orange-400)',
+                }}
+              >
+                <CheckCircle2 size={15} />
+                <span>{saveSuccessMsg}</span>
+              </div>
+            )}
+
+            <div
+              className="p-4 rounded-xl flex flex-col gap-4"
+              style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+              }}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{
+                      background: 'var(--orange-900)',
+                      color: 'var(--orange-400)',
+                      border: '1px solid var(--border-subtle)',
+                    }}
+                  >
+                    <FileSpreadsheet size={18} />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-white">Importaciones CSV</h2>
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      Historial de archivos de estados de cuenta importados y reversión atómica.
+                    </p>
+                  </div>
+                </div>
+
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={Plus}
+                  onClick={() => setIsImportModalOpen(true)}
+                >
+                  Importar CSV
+                </Button>
+              </div>
+
+              {/* Lista de lotes importados */}
+              {loadingBatches ? (
+                <div className="py-8 text-center text-xs text-[var(--text-muted)] font-mono">
+                  Cargando historial de importaciones...
+                </div>
+              ) : batches.length === 0 ? (
+                <div
+                  className="py-12 px-4 rounded-xl flex flex-col items-center justify-center gap-2 text-center"
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    border: '1px dashed var(--border-subtle)',
+                  }}
+                >
+                  <FileSpreadsheet size={28} className="text-[var(--text-muted)]" />
+                  <span className="text-xs font-semibold text-white">Sin importaciones registradas</span>
+                  <p className="text-[11px] text-[var(--text-muted)] max-w-xs">
+                    No has importado ningún estado de cuenta bancario en CSV todavía.
+                  </p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={Upload}
+                    onClick={() => setIsImportModalOpen(true)}
+                    className="mt-2"
+                  >
+                    Importar primer archivo
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2.5">
+                  {batches.map((batch) => {
+                    const acc = accountsMap.get(batch.accountId)
+                    return (
+                      <div
+                        key={batch.id}
+                        className="p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors"
+                        style={{
+                          background: 'var(--bg-elevated)',
+                          border: '1px solid var(--border-subtle)',
+                        }}
+                      >
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div
+                            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                            style={{
+                              background: 'var(--bg-surface)',
+                              color: 'var(--orange-400)',
+                              border: '1px solid var(--border-subtle)',
+                            }}
+                          >
+                            <FileSpreadsheet size={16} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-bold text-xs text-white truncate max-w-[200px] sm:max-w-[300px]">
+                                {batch.fileName}
+                              </span>
+                              {acc && (
+                                <span
+                                  className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                                  style={{
+                                    background: 'var(--bg-surface)',
+                                    color: 'var(--orange-400)',
+                                    border: '1px solid var(--border-subtle)',
+                                  }}
+                                >
+                                  {accountLabel(acc)}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[11px] text-[var(--text-muted)] font-mono">
+                              <span>{formatDate(batch.importedAt?.slice(0, 10))}</span>
+                              <span>•</span>
+                              <span>{batch.rowsImported} {batch.rowsImported === 1 ? 'movimiento' : 'movimientos'}</span>
+                              <span>•</span>
+                              <span className="text-[var(--text-primary)]">
+                                Gastos: {formatMoney(batch.totalExpenseCents || 0)}
+                              </span>
+                              {batch.totalIncomeCents > 0 && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-[var(--text-primary)]">
+                                    Ingresos: {formatMoney(batch.totalIncomeCents || 0)}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end flex-shrink-0">
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            icon={RotateCcw}
+                            onClick={async () => {
+                              if (window.confirm(`¿Deshacer la importación "${batch.fileName}"?\n\nSe eliminarán los ${batch.rowsImported} movimientos registrados en este lote y se restaurarán los saldos correspondientes de la cuenta.`)) {
+                                try {
+                                  await revertBatch(batch.id)
+                                  fetchAccounts()
+                                  fetchMovements()
+                                  setSaveSuccessMsg('Importación revertida con éxito y saldos restaurados.')
+                                  setTimeout(() => setSaveSuccessMsg(''), 3500)
+                                } catch (err) {
+                                  alert(`Error al revertir: ${err.message}`)
+                                }
+                              }
+                            }}
+                          >
+                            Deshacer
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2258,6 +2792,21 @@ export default function SettingsPage() {
           setPermissionStatus('granted')
           rescheduleAll().catch(() => {})
           setSaveSuccessMsg('Permisos otorgados y recordatorios sincronizados.')
+          setTimeout(() => setSaveSuccessMsg(''), 4000)
+        }}
+      />
+
+      {/* ── Modal de Importación de CSV ── */}
+      <CsvImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        accounts={accounts}
+        categories={categories}
+        onSuccess={(msg) => {
+          setSaveSuccessMsg(msg)
+          fetchBatches()
+          fetchAccounts()
+          fetchMovements()
           setTimeout(() => setSaveSuccessMsg(''), 4000)
         }}
       />

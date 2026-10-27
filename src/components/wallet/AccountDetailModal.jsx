@@ -18,6 +18,7 @@ import {
   Plus,
   PiggyBank,
   Link2,
+  FileSpreadsheet,
 } from 'lucide-react'
 import Modal from '../ui/Modal.jsx'
 import Button from '../ui/Button.jsx'
@@ -39,6 +40,7 @@ export default function AccountDetailModal({
   onDelete,
   onPayCard,
   onAddCaja,
+  onImportCsv,
 }) {
   const { movements, deleteMovement } = useMovements()
   const { accounts, reorderAccounts, updateAccount } = useAccounts()
@@ -365,12 +367,63 @@ export default function AccountDetailModal({
             <YieldPanel account={account} />
           )}
 
+          {/* ── Reordenar tarjeta (Alternativa táctil sin arrastre) ── */}
+          {accounts.length > 1 && (
+            <div
+              className="flex items-center justify-between p-3 rounded-xl gap-2"
+              style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
+            >
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold text-white">Posición en la billetera</span>
+                <span className="text-[11px] text-[var(--text-secondary)]">
+                  {currentIndex + 1} de {sortedAll.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={ChevronUp}
+                  disabled={!canMoveUp}
+                  onClick={handleMoveUp}
+                  title="Mover arriba"
+                >
+                  Subir
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={ChevronDown}
+                  disabled={!canMoveDown}
+                  onClick={handleMoveDown}
+                  title="Mover abajo"
+                >
+                  Bajar
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* ── Botones de Acción ── */}
-          <div className="flex flex-col sm:flex-row items-center gap-3 mt-2">
+          <div className="flex flex-col gap-2.5 mt-2 pt-3 border-t border-[var(--border-subtle)]">
             <Button
               variant="secondary"
-              className="w-full flex-1"
+              className="w-full text-white"
+              icon={FileSpreadsheet}
+              style={{ minHeight: '44px' }}
+              onClick={() => {
+                onClose()
+                onImportCsv?.(account)
+              }}
+            >
+              Importar estado de cuenta CSV
+            </Button>
+
+            <Button
+              variant="secondary"
+              className="w-full"
               icon={Edit2}
+              style={{ minHeight: '44px' }}
               onClick={() => {
                 onClose()
                 onEdit(account)
@@ -380,12 +433,18 @@ export default function AccountDetailModal({
             </Button>
 
             <Button
-              variant={confirmDelete ? 'danger' : 'ghost'}
-              className="w-full sm:w-auto text-xs"
+              variant={confirmDelete ? 'danger' : 'secondary'}
+              className="w-full font-medium transition-colors"
+              style={{
+                borderColor: confirmDelete ? 'var(--red-500)' : 'rgba(239, 68, 68, 0.4)',
+                background: confirmDelete ? 'var(--red-900)' : 'rgba(239, 68, 68, 0.08)',
+                color: 'var(--red-400)',
+                minHeight: '44px',
+              }}
               icon={confirmDelete ? ShieldAlert : Trash2}
               onClick={handleDelete}
             >
-              {confirmDelete ? '¿Confirmar eliminación?' : 'Eliminar'}
+              {confirmDelete ? '¿Confirmar: Eliminar esta tarjeta?' : 'Eliminar tarjeta'}
             </Button>
           </div>
         </div>

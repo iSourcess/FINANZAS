@@ -514,9 +514,16 @@ export default function MovementForm({
             variant="primary"
             type="submit"
             size="lg"
-            className="w-full text-base font-semibold shadow-md"
+            className="w-full text-base font-bold tracking-wide"
             icon={Check}
-            style={{ minHeight: '48px', height: '48px' }}
+            style={{
+              minHeight: '52px',
+              height: '52px',
+              background: 'linear-gradient(135deg, var(--orange-400) 0%, var(--orange-500) 100%)',
+              color: '#0A0A0A',
+              boxShadow: '0 4px 16px rgba(255, 122, 26, 0.45)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+            }}
           >
             Registrar movimiento
           </Button>

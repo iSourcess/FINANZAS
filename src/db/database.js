@@ -407,6 +407,47 @@ db.version(9)
     }
   })
 
+db.version(10)
+  .stores({
+    /**
+     * Versión 10:
+     * - movements: agrega índice importBatchId para trazabilidad y reversión en lote.
+     * - importProfiles: perfiles de mapeo guardados por cuenta para no repetir la configuración.
+     * - categoryRules: reglas de categorización automática (palabra clave -> categoría con hitCount).
+     * - importBatches: historial de lotes de importación para auditoría y opción de deshacer.
+     */
+    accounts: '++id, type, currency, parentId, sortOrder, lastReconciledAt',
+    movements: '++id, accountId, toAccountId, categoryId, date, type, reason, debtId, importBatchId',
+    categories: '++id, type',
+    budgets: '++id, categoryId',
+    fixedExpenses: '++id, categoryId, accountId',
+    holdings: '++id, symbol, kind',
+    lots: '++id, holdingId, symbol, date',
+    priceCache: 'symbol',
+    priceHistory: '++id, [symbol+date], symbol, date',
+    settings: 'id',
+    fxHistory: '++id, [pair+date], pair, date',
+    goals: '++id, name, targetDate, status, createdAt',
+    goalContributions: '++id, goalId, accountId, date, createdAt',
+    templates: '++id, sortOrder, useCount, type, categoryId, accountId',
+    recurringIncomes: '++id, frequency, categoryId, accountId, active, startDate',
+    recurringIncomeOccurrences: '++id, [recurringId+dueDate], recurringId, dueDate, status',
+    debts: '++id, direction, person, status, openedAt, dueDate',
+    debtPayments: '++id, debtId, date, accountId, adjustmentId',
+    importProfiles: '++id, accountId, name, updatedAt',
+    categoryRules: '++id, keyword, categoryId, hitCount, createdAt',
+    importBatches: '++id, accountId, date, fileName, status, createdAt',
+  })
+  .upgrade(async (tx) => {
+    // Migración v9 -> v10: asegurar que movements existentes tengan importBatchId en null si no existía
+    const movements = await tx.table('movements').toArray()
+    for (const m of movements) {
+      if (m.importBatchId === undefined) {
+        await tx.table('movements').update(m.id, { importBatchId: null })
+      }
+    }
+  })
+
 export default db
 
 

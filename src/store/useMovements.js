@@ -53,6 +53,9 @@ export const useMovements = create((set, get) => ({
         categories: allCategories,
         loading: false,
       })
+
+      // Sincronizar widget nativo de pantalla de inicio
+      triggerWidgetSync(allMovements)
     } catch (err) {
       console.error('[useMovements] Error al cargar movimientos:', err)
       set({ error: 'No se pudieron cargar los movimientos.', loading: false })
@@ -143,6 +146,9 @@ export const useMovements = create((set, get) => ({
       import('../services/notifications.js').then(({ rescheduleAll }) => {
         rescheduleAll().catch(() => {})
       }).catch(() => {})
+
+      // Sincronizar widget nativo de pantalla de inicio
+      triggerWidgetSync([newMovement, ...get().movements])
 
       return newMovement
     } catch (err) {
@@ -278,6 +284,9 @@ export const useMovements = create((set, get) => ({
 
       // Actualizar cuentas
       useAccounts.getState().fetchAccounts()
+
+      // Sincronizar widget nativo de pantalla de inicio
+      triggerWidgetSync(get().movements)
     } catch (err) {
       console.error('[useMovements] Error al eliminar movimiento:', err)
       set({ error: 'No se pudo eliminar el movimiento.', loading: false })
@@ -319,13 +328,17 @@ export const useMovements = create((set, get) => ({
         }
       })
 
-      set(state => ({
-        movements: [deleted, ...state.movements],
+      const updatedMovements = [deleted, ...get().movements]
+      set({
+        movements: updatedMovements,
         lastDeleted: null,
         loading: false,
-      }))
+      })
 
       useAccounts.getState().fetchAccounts()
+
+      // Sincronizar widget nativo de pantalla de inicio
+      triggerWidgetSync(updatedMovements)
     } catch (err) {
       console.error('[useMovements] Error al deshacer eliminación:', err)
       set({ error: 'No se pudo restaurar el movimiento.', loading: false })
@@ -339,3 +352,16 @@ export const useMovements = create((set, get) => ({
     set({ lastDeleted: null })
   },
 }))
+
+/**
+ * Notifica en segundo plano al servicio de sincronización del widget nativo.
+ */
+function triggerWidgetSync(movements) {
+  if (!Array.isArray(movements)) return
+  import('./useSettings.js').then(({ useSettings }) => {
+    const settings = useSettings.getState().settings
+    import('../services/widget.js').then(({ syncWidgetSnapshot }) => {
+      syncWidgetSnapshot({ movements, settings }).catch(() => {})
+    }).catch(() => {})
+  }).catch(() => {})
+}
