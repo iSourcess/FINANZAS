@@ -92,5 +92,42 @@ describe('Domain: credit cards and billing cycles', () => {
       expect(status.activeMsiList[0].paidMonths).toBe(1)
       expect(status.activeMsiList[0].totalMonths).toBe(6)
     })
+
+    it('calculates daysToCut and daysToPay identically at 00:01 and 23:59 of the same day', () => {
+      const account = {
+        id: 'nu-credit',
+        type: 'credit',
+        balance: 100_000,
+        credit: {
+          limit: 1_000_000,
+          cutDay: 17,
+          payDay: 7,
+        },
+      }
+
+      // Referencia a las 00:01 del 12 de octubre 2026
+      const morningRef = new Date(2026, 9, 12, 0, 1, 0)
+      const morningStatus = getCreditCardStatus({
+        account,
+        movements: [],
+        referenceDate: morningRef,
+      })
+
+      // Referencia a las 23:59 del 12 de octubre 2026
+      const nightRef = new Date(2026, 9, 12, 23, 59, 0)
+      const nightStatus = getCreditCardStatus({
+        account,
+        movements: [],
+        referenceDate: nightRef,
+      })
+
+      // Del 12 al 17 de octubre son exactamente 5 días de calendario
+      expect(morningStatus.daysToCut).toBe(5)
+      expect(nightStatus.daysToCut).toBe(5)
+
+      // Del 12 de octubre al 7 de noviembre son exactamente 26 días de calendario
+      expect(morningStatus.daysToPay).toBe(26)
+      expect(nightStatus.daysToPay).toBe(26)
+    })
   })
 })

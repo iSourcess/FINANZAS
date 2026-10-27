@@ -34,6 +34,79 @@ export const useAccounts = create((set, get) => ({
       if (items.length === 0) {
         await runSeed()
         items = await db.accounts.toArray()
+      } else {
+        // Sincronización / migración de tasas y cajitas
+        let needsReload = false
+
+        for (const item of items) {
+          // Nu: Si tiene Cajita Turbo con el segundo tramo viejo del 7%, actualizar a solo 13%
+          if (
+            item.themeKey === 'nu' &&
+            (item.yieldCapBase === 'principal' || item.isTurbo || item.name.toLowerCase().includes('turbo'))
+          ) {
+            if (Array.isArray(item.yieldTiers) && item.yieldTiers.length > 1) {
+              item.yieldTiers = [{ upTo: 2_500_000, rate: 0.13 }]
+              await db.accounts.update(item.id, { yieldTiers: item.yieldTiers })
+              needsReload = true
+            }
+            if (item.name === 'Nu Débito') {
+              item.name = 'Cajita Turbo'
+              item.type = 'savings'
+              await db.accounts.update(item.id, { name: 'Cajita Turbo', type: 'savings' })
+              needsReload = true
+            }
+          }
+
+          // Mercado Pago: actualizar a 15% hasta $25k y 5.3% excedente si tenía tasas anteriores
+          if (item.themeKey === 'mercadoPago') {
+            const tiers = item.yieldTiers
+            if (
+              Array.isArray(tiers) &&
+              (tiers[0]?.rate !== 0.15 || tiers[1]?.rate !== 0.053)
+            ) {
+              item.yieldTiers = [
+                { upTo: 2_500_000, rate: 0.15 },
+                { upTo: null, rate: 0.053 },
+              ]
+              await db.accounts.update(item.id, { yieldTiers: item.yieldTiers })
+              needsReload = true
+            }
+          }
+        }
+
+        // Si existe Nu pero no existe 'Cajita Ahorro', agregarla automáticamente
+        const hasNu = items.some((a) => a.themeKey === 'nu')
+        const hasAhorro = items.some(
+          (a) =>
+            a.name.toLowerCase().includes('cajita ahorro') ||
+            a.name.toLowerCase() === 'ahorro nu'
+        )
+        if (hasNu && !hasAhorro) {
+          const maxOrder = items.reduce((max, acc) => Math.max(max, acc.sortOrder ?? 0), 0)
+          const cajitaAhorro = {
+            id: crypto.randomUUID(),
+            name: 'Cajita Ahorro',
+            type: 'savings',
+            currency: 'MXN',
+            balance: 0,
+            themeKey: 'nu',
+            color: null,
+            hidden: false,
+            sortOrder: maxOrder + 1,
+            yieldTiers: [{ upTo: null, rate: 0.07 }],
+            yieldCapBase: 'balance',
+            parentId: null,
+            credit: null,
+            createdAt: new Date().toISOString(),
+          }
+          await db.accounts.add(cajitaAhorro)
+          items.push(cajitaAhorro)
+          needsReload = true
+        }
+
+        if (needsReload) {
+          items = await db.accounts.toArray()
+        }
       }
 
       // Ordenar por sortOrder ascendente

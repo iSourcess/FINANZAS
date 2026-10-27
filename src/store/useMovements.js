@@ -18,6 +18,7 @@ import {
   applyMovementToAccount,
   revertMovementFromAccount,
 } from '../domain/movements.js'
+import { todayLocalISO } from '../lib/format.js'
 
 export const useMovements = create((set, get) => ({
   movements: [],
@@ -65,26 +66,41 @@ export const useMovements = create((set, get) => ({
   addMovement: async (movementData) => {
     set({ loading: true, error: null })
     try {
-      // Obtener tipo de cambio de settings si es USD
+      // Obtener tipo de cambio del store useFx si es moneda extranjera (fuente única de verdad)
       let fxRate = 1
-      if (movementData.currency === 'USD') {
-        const settings = await db.settings.get('global')
-        fxRate = settings?.fxRateManual ? (settings.fxRateManual > 100 ? settings.fxRateManual / 100 : settings.fxRateManual) : 20.0
+      if (movementData.currency && movementData.currency !== 'MXN') {
+        try {
+          const { useFx } = await import('./useFx.js')
+          fxRate = useFx.getState().getRate(movementData.currency)
+        } catch {
+          const settings = await db.settings.get('global')
+          fxRate = settings?.fxRateManual ? (settings.fxRateManual > 100 ? settings.fxRateManual / 100 : settings.fxRateManual) : 20.0
+        }
       }
+
+      const isAdjustment = movementData.type === 'adjustment'
+      const deltaCents = isAdjustment
+        ? Math.round(Number(movementData.deltaCents !== undefined ? movementData.deltaCents : movementData.amount) || 0)
+        : null
 
       const newMovement = {
         id: crypto.randomUUID(),
-        type: movementData.type || 'expense', // 'income' | 'expense' | 'transfer'
-        amount: Math.round(Number(movementData.amount) || 0), // Centavos
+        type: movementData.type || 'expense', // 'income' | 'expense' | 'transfer' | 'adjustment'
+        amount: isAdjustment ? Math.abs(deltaCents) : Math.round(Number(movementData.amount) || 0), // Centavos
+        deltaCents: isAdjustment ? deltaCents : null,
+        reason: isAdjustment ? (movementData.reason || 'reconcile') : null,
+        debtId: movementData.debtId || null,
         currency: movementData.currency || 'MXN',
         fxRate,
         accountId: movementData.accountId,
         toAccountId: movementData.type === 'transfer' ? movementData.toAccountId : null,
-        categoryId: movementData.type === 'transfer' ? null : movementData.categoryId,
-        date: movementData.date || new Date().toISOString().slice(0, 10),
+        categoryId: (movementData.type === 'transfer' || isAdjustment) ? null : movementData.categoryId,
+        date: movementData.date || todayLocalISO(),
         note: (movementData.note || '').trim(),
-        msi: null,
-        fixedId: null,
+        msi: movementData.msi || null,
+        fixedId: movementData.fixedId || null,
+        recurringIncomeId: movementData.recurringIncomeId || null,
+        recurringDueDate: movementData.recurringDueDate || null,
         createdAt: new Date().toISOString(),
       }
 
@@ -97,7 +113,11 @@ export const useMovements = create((set, get) => ({
         const sourceAcc = await db.accounts.get(newMovement.accountId)
         if (sourceAcc) {
           const updatedSource = applyMovementToAccount(sourceAcc, newMovement, true)
-          await db.accounts.update(sourceAcc.id, { balance: updatedSource.balance })
+          const accountUpdates = { balance: updatedSource.balance }
+          if (newMovement.type === 'adjustment') {
+            accountUpdates.lastReconciledAt = newMovement.date
+          }
+          await db.accounts.update(sourceAcc.id, accountUpdates)
         }
 
         // 3. Si es transferencia, actualizar cuenta destino
@@ -118,6 +138,11 @@ export const useMovements = create((set, get) => ({
 
       // Sincronizar store de cuentas
       useAccounts.getState().fetchAccounts()
+
+      // Reprogramar recordatorios (cancela el diario de hoy si ya hubo movimiento)
+      import('../services/notifications.js').then(({ rescheduleAll }) => {
+        rescheduleAll().catch(() => {})
+      }).catch(() => {})
 
       return newMovement
     } catch (err) {
@@ -154,10 +179,18 @@ export const useMovements = create((set, get) => ({
         }
 
         // 2. Preparar nuevo movimiento
+        const isAdj = (updates.type ?? oldMovement.type) === 'adjustment'
+        const updatedDelta = isAdj
+          ? Math.round(Number(updates.deltaCents ?? oldMovement.deltaCents ?? updates.amount ?? oldMovement.amount) || 0)
+          : null
+
         const updatedMovement = {
           ...oldMovement,
           ...updates,
-          amount: Math.round(Number(updates.amount ?? oldMovement.amount) || 0),
+          amount: isAdj ? Math.abs(updatedDelta) : Math.round(Number(updates.amount ?? oldMovement.amount) || 0),
+          deltaCents: isAdj ? updatedDelta : null,
+          reason: isAdj ? (updates.reason ?? oldMovement.reason ?? 'reconcile') : null,
+          debtId: updates.debtId !== undefined ? updates.debtId : (oldMovement.debtId || null),
           note: (updates.note ?? oldMovement.note ?? '').trim(),
         }
 
@@ -168,7 +201,11 @@ export const useMovements = create((set, get) => ({
         const newSource = await db.accounts.get(updatedMovement.accountId)
         if (newSource) {
           const appliedSource = applyMovementToAccount(newSource, updatedMovement, true)
-          await db.accounts.update(newSource.id, { balance: appliedSource.balance })
+          const accountUpdates = { balance: appliedSource.balance }
+          if (updatedMovement.type === 'adjustment') {
+            accountUpdates.lastReconciledAt = updatedMovement.date
+          }
+          await db.accounts.update(newSource.id, accountUpdates)
         }
         if (updatedMovement.type === 'transfer' && updatedMovement.toAccountId) {
           const newDest = await db.accounts.get(updatedMovement.toAccountId)
@@ -220,6 +257,17 @@ export const useMovements = create((set, get) => ({
 
         // 3. Eliminar
         await db.movements.delete(id)
+
+        // 4. Si fue ajuste, actualizar lastReconciledAt con el ajuste restante más reciente
+        if (movementToDelete.type === 'adjustment' && sourceAcc) {
+          const remaining = await db.movements
+            .where('accountId')
+            .equals(sourceAcc.id)
+            .filter((m) => m.id !== id && m.type === 'adjustment')
+            .sortBy('date')
+          const latest = remaining.length > 0 ? remaining[remaining.length - 1].date : null
+          await db.accounts.update(sourceAcc.id, { lastReconciledAt: latest })
+        }
       })
 
       set(state => ({
@@ -254,7 +302,11 @@ export const useMovements = create((set, get) => ({
         const sourceAcc = await db.accounts.get(deleted.accountId)
         if (sourceAcc) {
           const applied = applyMovementToAccount(sourceAcc, deleted, true)
-          await db.accounts.update(sourceAcc.id, { balance: applied.balance })
+          const accUpdates = { balance: applied.balance }
+          if (deleted.type === 'adjustment') {
+            accUpdates.lastReconciledAt = deleted.date
+          }
+          await db.accounts.update(sourceAcc.id, accUpdates)
         }
 
         // Restaurar balance destino si fue transferencia

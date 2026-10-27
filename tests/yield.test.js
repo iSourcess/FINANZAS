@@ -51,24 +51,23 @@ describe('Domain: yield calculations', () => {
       expect(result.capStatus.warningMessage).toBeNull()
     })
 
-    it('handles excess principal above $25,000 with warning and overflow rate', () => {
-      // $30,000 total: $25,000 al 13% y $5,000 al 7%
+    it('handles excess principal above $25,000 with warning and default 0% overflow rate in Turbo', () => {
+      // $30,000 total: $25,000 al 13% y $5,000 al 0% (el excedente no rinde en Turbo)
       const result = calculateTurboYield({
         principalCents: 3_000_000,
         accumulatedInterestCents: 0,
         rate: 0.13,
-        overflowRate: 0.07,
       })
 
       // 25k * 0.13 / 365 = 8.9041 MXN/día
-      // 5k * 0.07 / 365 = 0.9589 MXN/día
-      // Total diario = 9.863 MXN/día (~986.3 centavos)
+      // 5k * 0 / 365 = 0 MXN/día
       const dailyPesos = result.dailyCents / 100
-      expect(dailyPesos).toBeCloseTo(9.863, 2)
+      expect(dailyPesos).toBeCloseTo(8.904, 2)
 
       expect(result.capStatus.isOverCap).toBe(true)
       expect(result.capStatus.excessCents).toBe(500000) // $5,000 excedente
-      expect(result.capStatus.warningMessage).toContain('Superaste el tope de $25,000')
+      expect(result.capStatus.warningMessage).toContain('Superaste el tope de depósito de $25,000')
+      expect(result.capStatus.warningMessage).toContain('Cajita Ahorro (7%)')
     })
 
     it('calculates remaining amount to reach cap when balance is under $25,000', () => {
@@ -92,6 +91,40 @@ describe('Domain: yield calculations', () => {
       // 26,000 * 0.13 / 365 = 9.2602 MXN/día
       const dailyPesos = result.dailyCents / 100
       expect(dailyPesos).toBeCloseTo(9.26, 2)
+    })
+
+    it('infers balance above $25,000 as accumulated interest compounding at 13%', () => {
+      const result = calculateAccountYield({
+        balanceCents: 2_794_910, // $27,949.10
+        yieldTiers: [{ upTo: 2_500_000, rate: 0.13 }],
+        yieldCapBase: 'principal',
+      })
+
+      // Capital: $25,000
+      expect(result.principalCents).toBe(2_500_000)
+      // Intereses acumulados: $2,949.10
+      expect(result.accumulatedInterestCents).toBe(294_910)
+      // Ambos rinden al 13%: 27,949.10 * 0.13 / 365 = 9.954 MXN/día
+      const dailyPesos = result.dailyCents / 100
+      expect(dailyPesos).toBeCloseTo(9.954, 2)
+      // No está sobre el tope de depósito de capital
+      expect(result.capStatus.isOverCap).toBe(false)
+      expect(result.capStatus.excessCents).toBe(0)
+    })
+  })
+
+  describe('Nu Cajita Ahorro (7% flat, no cap)', () => {
+    it('calculates 7% yield without cap for any balance', () => {
+      const result = calculateAccountYield({
+        balanceCents: 10_000_000, // $100,000
+        yieldTiers: [{ upTo: null, rate: 0.07 }],
+      })
+
+      // 100,000 * 0.07 / 365 = 19.178 MXN/día
+      const dailyPesos = result.dailyCents / 100
+      expect(dailyPesos).toBeCloseTo(19.178, 2)
+      expect(result.capStatus.hasCap).toBe(false)
+      expect(result.capStatus.isOverCap).toBe(false)
     })
   })
 
@@ -127,25 +160,25 @@ describe('Domain: yield calculations', () => {
     })
   })
 
-  describe('Mercado Pago tiered yield (12% up to $25k, 6% excess)', () => {
+  describe('Mercado Pago Apartados (15% up to $25k, 5.3% excess)', () => {
     const mpTiers = [
-      { upTo: 2_500_000, rate: 0.12 },
-      { upTo: null, rate: 0.06 },
+      { upTo: 2_500_000, rate: 0.15 },
+      { upTo: null, rate: 0.053 },
     ]
 
     it('calculates mixed rate for $50,000', () => {
-      // 25k * 0.12 / 365 = 8.219 MXN
-      // 25k * 0.06 / 365 = 4.110 MXN
-      // Total = 12.329 MXN/día
+      // 25k * 0.15 / 365 = 10.274 MXN
+      // 25k * 0.053 / 365 = 3.630 MXN
+      // Total = 13.904 MXN/día
       const result = calculateAccountYield({
         balanceCents: 5_000_000,
         yieldTiers: mpTiers,
       })
 
       const dailyPesos = result.dailyCents / 100
-      expect(dailyPesos).toBeCloseTo(12.329, 2)
-      // Tasa ponderada = (25*12 + 25*6) / 50 = 9.0%
-      expect(result.weightedNominalRate).toBeCloseTo(0.09, 2)
+      expect(dailyPesos).toBeCloseTo(13.904, 2)
+      // Tasa ponderada = (25*0.15 + 25*0.053) / 50 = 10.15%
+      expect(result.weightedNominalRate).toBeCloseTo(0.1015, 3)
     })
   })
 

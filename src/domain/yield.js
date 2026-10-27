@@ -133,7 +133,7 @@ export function getCapStatus(balanceCents, yieldTiers = [], isTurbo = false) {
 
   if (isOverCap) {
     warningMessage = isTurbo
-      ? `Superaste el tope de $25,000 en Cajita Turbo. El excedente no rinde al 13%. Te sugerimos moverlo a otra cajita al 7%.`
+      ? `Superaste el tope de depósito de $25,000 en Cajita Turbo. El capital excedente no rinde aquí (0%). Muévelo a tu Cajita Ahorro (7%).`
       : `Has superado el tope del primer tramo de tasa alta. El excedente aplica al tramo siguiente.`
   } else if (remainingCents > 0) {
     infoMessage = `Te faltan para llegar al tope de tasa alta.`
@@ -155,20 +155,22 @@ export function getCapStatus(balanceCents, yieldTiers = [], isTurbo = false) {
 /**
  * Cálculo específico para Nu Cajita Turbo:
  * El capital depositado hasta $25,000 rinde al 13%, y los intereses acumulados
- * capitalizan y continúan rindiendo al 13%.
+ * capitalizan a diario y continúan rindiendo al 13%.
+ * El excedente de capital depositado sobre $25,000 NO rinde en la Turbo (0%),
+ * debe transferirse a Cajita Ahorro (7%).
  *
  * @param {Object} params
  * @param {number} params.principalCents - Capital depositado en centavos
  * @param {number} [params.accumulatedInterestCents=0] - Intereses históricos generados
  * @param {number} [params.rate=0.13] - Tasa nominal de la cajita turbo
- * @param {number} [params.overflowRate=0.07] - Tasa para el excedente si se queda en Nu normal
+ * @param {number} [params.overflowRate=0] - Tasa para el excedente en la Turbo (0% por defecto)
  * @returns {Object}
  */
 export function calculateTurboYield({
   principalCents = 0,
   accumulatedInterestCents = 0,
   rate = 0.13,
-  overflowRate = 0.07,
+  overflowRate = 0,
 }) {
   const safePrincipal = Math.max(0, Math.round(principalCents))
   const safeAccumulated = Math.max(0, Math.round(accumulatedInterestCents))
@@ -176,11 +178,11 @@ export function calculateTurboYield({
   const cappedPrincipal = Math.min(safePrincipal, TURBO_CAP_CENTS)
   const excessPrincipal = Math.max(0, safePrincipal - TURBO_CAP_CENTS)
 
-  // Base con tasa alta (capital topado + intereses capitalizados)
+  // Base con tasa alta (capital topado + intereses capitalizados al 13%)
   const highYieldBase = cappedPrincipal + safeAccumulated
   const highYieldDaily = (highYieldBase * rate) / 365
 
-  // Interés diario del excedente a tasa normal
+  // Interés diario del excedente en la Turbo (0%)
   const excessDaily = (excessPrincipal * overflowRate) / 365
 
   const totalDailyCents = highYieldDaily + excessDaily
@@ -226,11 +228,23 @@ export function calculateAccountYield({
 
   // Si es Turbo explícitamente o tiene base 'principal' con tope de $25k al 13%
   if (isTurbo || (yieldCapBase === 'principal' && yieldTiers?.[0]?.rate === 0.13)) {
+    let principalCents = safeBalance
+    let accInterestCents = Math.max(0, Math.round(accumulatedInterestCents || 0))
+
+    if (accInterestCents > 0) {
+      principalCents = Math.max(0, safeBalance - accInterestCents)
+    } else if (safeBalance > TURBO_CAP_CENTS) {
+      // En Nu el límite para depositar es $25,000; todo saldo adicional por encima
+      // corresponde a intereses acumulados que siguen rindiendo al 13% (interés compuesto).
+      principalCents = TURBO_CAP_CENTS
+      accInterestCents = safeBalance - TURBO_CAP_CENTS
+    }
+
     return calculateTurboYield({
-      principalCents: safeBalance,
-      accumulatedInterestCents,
+      principalCents,
+      accumulatedInterestCents: accInterestCents,
       rate: yieldTiers?.[0]?.rate || 0.13,
-      overflowRate: yieldTiers?.[1]?.rate || 0.07,
+      overflowRate: yieldTiers?.[1]?.rate || 0,
     })
   }
 

@@ -90,16 +90,37 @@ async function saveAndShareFile(content, filename, mimeType) {
  */
 export async function exportDatabaseToJSON() {
   try {
-    const [accounts, movements, categories, budgets, fixedExpenses, holdings, settings] =
-      await Promise.all([
-        db.accounts.toArray(),
-        db.movements.toArray(),
-        db.categories.toArray(),
-        db.budgets.toArray(),
-        db.fixedExpenses.toArray(),
-        db.holdings.toArray(),
-        db.settings.toArray(),
-      ])
+    const [
+      accounts,
+      movements,
+      categories,
+      budgets,
+      fixedExpenses,
+      holdings,
+      settings,
+      goals,
+      goalContributions,
+      templates,
+      recurringIncomes,
+      recurringIncomeOccurrences,
+      debts,
+      debtPayments,
+    ] = await Promise.all([
+      db.accounts.toArray(),
+      db.movements.toArray(),
+      db.categories.toArray(),
+      db.budgets.toArray(),
+      db.fixedExpenses.toArray(),
+      db.holdings.toArray(),
+      db.settings.toArray(),
+      db.goals ? db.goals.toArray().catch(() => []) : Promise.resolve([]),
+      db.goalContributions ? db.goalContributions.toArray().catch(() => []) : Promise.resolve([]),
+      db.templates ? db.templates.toArray().catch(() => []) : Promise.resolve([]),
+      db.recurringIncomes ? db.recurringIncomes.toArray().catch(() => []) : Promise.resolve([]),
+      db.recurringIncomeOccurrences ? db.recurringIncomeOccurrences.toArray().catch(() => []) : Promise.resolve([]),
+      db.debts ? db.debts.toArray().catch(() => []) : Promise.resolve([]),
+      db.debtPayments ? db.debtPayments.toArray().catch(() => []) : Promise.resolve([]),
+    ])
 
     const timestamp = new Date().toISOString()
     const dateStr = timestamp.slice(0, 10).replace(/-/g, '')
@@ -118,6 +139,13 @@ export async function exportDatabaseToJSON() {
         fixedExpenses,
         holdings,
         settings,
+        goals,
+        goalContributions,
+        templates,
+        recurringIncomes,
+        recurringIncomeOccurrences,
+        debts,
+        debtPayments,
       },
     }
 
@@ -279,27 +307,44 @@ export function validateBackupJSON(jsonString) {
  */
 export async function restoreDatabase(data) {
   try {
+    const tablesToLock = [
+      db.accounts,
+      db.movements,
+      db.categories,
+      db.budgets,
+      db.fixedExpenses,
+      db.holdings,
+      db.settings,
+    ]
+    if (db.goals) tablesToLock.push(db.goals)
+    if (db.goalContributions) tablesToLock.push(db.goalContributions)
+    if (db.templates) tablesToLock.push(db.templates)
+    if (db.recurringIncomes) tablesToLock.push(db.recurringIncomes)
+    if (db.recurringIncomeOccurrences) tablesToLock.push(db.recurringIncomeOccurrences)
+    if (db.debts) tablesToLock.push(db.debts)
+    if (db.debtPayments) tablesToLock.push(db.debtPayments)
+
     await db.transaction(
       'rw',
-      [
-        db.accounts,
-        db.movements,
-        db.categories,
-        db.budgets,
-        db.fixedExpenses,
-        db.holdings,
-        db.settings,
-      ],
+      tablesToLock,
       async () => {
         // 1. Limpiar tablas existentes
-        await Promise.all([
+        const clearTasks = [
           db.accounts.clear(),
           db.movements.clear(),
           db.categories.clear(),
           db.budgets.clear(),
           db.fixedExpenses.clear(),
           db.holdings.clear(),
-        ])
+        ]
+        if (db.goals) clearTasks.push(db.goals.clear())
+        if (db.goalContributions) clearTasks.push(db.goalContributions.clear())
+        if (db.templates) clearTasks.push(db.templates.clear())
+        if (db.recurringIncomes) clearTasks.push(db.recurringIncomes.clear())
+        if (db.recurringIncomeOccurrences) clearTasks.push(db.recurringIncomeOccurrences.clear())
+        if (db.debts) clearTasks.push(db.debts.clear())
+        if (db.debtPayments) clearTasks.push(db.debtPayments.clear())
+        await Promise.all(clearTasks)
 
         // 2. Restaurar registros
         if (Array.isArray(data.categories) && data.categories.length > 0) {
@@ -324,6 +369,27 @@ export async function restoreDatabase(data) {
           await db.settings.bulkPut(data.settings)
         } else if (data.settings && typeof data.settings === 'object') {
           await db.settings.put(data.settings)
+        }
+        if (db.goals && Array.isArray(data.goals) && data.goals.length > 0) {
+          await db.goals.bulkAdd(data.goals)
+        }
+        if (db.goalContributions && Array.isArray(data.goalContributions) && data.goalContributions.length > 0) {
+          await db.goalContributions.bulkAdd(data.goalContributions)
+        }
+        if (db.templates && Array.isArray(data.templates) && data.templates.length > 0) {
+          await db.templates.bulkAdd(data.templates)
+        }
+        if (db.recurringIncomes && Array.isArray(data.recurringIncomes) && data.recurringIncomes.length > 0) {
+          await db.recurringIncomes.bulkAdd(data.recurringIncomes)
+        }
+        if (db.recurringIncomeOccurrences && Array.isArray(data.recurringIncomeOccurrences) && data.recurringIncomeOccurrences.length > 0) {
+          await db.recurringIncomeOccurrences.bulkAdd(data.recurringIncomeOccurrences)
+        }
+        if (db.debts && Array.isArray(data.debts) && data.debts.length > 0) {
+          await db.debts.bulkAdd(data.debts)
+        }
+        if (db.debtPayments && Array.isArray(data.debtPayments) && data.debtPayments.length > 0) {
+          await db.debtPayments.bulkAdd(data.debtPayments)
         }
       }
     )

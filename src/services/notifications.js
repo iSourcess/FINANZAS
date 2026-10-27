@@ -1,23 +1,71 @@
 /**
  * src/services/notifications.js
  *
- * Servicio de notificaciones locales para recordatorios financieros:
- *   - Fecha de corte de tarjetas de crédito.
- *   - Fecha límite de pago de tarjetas de crédito.
- *   - Gastos fijos pendientes de cobro en el mes.
+ * Servicio de notificaciones locales y recordatorios financieros unificados:
+ *   - Registro diario
+ *   - Fecha de corte y límite de pago de tarjetas de crédito
+ *   - Gastos fijos pendientes
+ *   - Ingresos recurrentes esperados
+ *   - Deudas y préstamos por vencer (upcomingDebtDue)
+ *   - Respaldo semanal
  *
- * Compatible con Capacitor Local Notifications (@capacitor/local-notifications)
- * con fallback a Web Notification API o degradación elegante sin romper la app.
+ * Canales en Android (para silenciarlos por separado):
+ *   1. 'daily_log' -> Registro diario
+ *   2. 'payments'  -> Cortes, pagos y gastos fijos
+ *   3. 'debts'     -> Deudas y préstamos
+ *   4. 'backup'    -> Copia de seguridad semanal
+ *
+ * Programación no exacta:
+ *   Usa allowWhileIdle: true sin requerir permiso de alarmas exactas (SCHEDULE_EXACT_ALARM).
+ *   Los avisos pueden diferir unos minutos según las políticas de reposo de Android (Doze).
+ *   El plugin @capacitor/local-notifications restaura las notificaciones pendientes
+ *   tras reiniciar el celular mediante LocalNotificationRestoreReceiver (BOOT_COMPLETED).
  */
 
-import { formatMoney } from '../lib/format.js'
+import { computeSchedule, REMINDER_CHANNELS } from '../domain/reminders.js'
+import { toISODate } from '../domain/periods.js'
+import { db } from '../db/database.js'
 
 /**
- * Genera un ID numérico entero de 32 bits a partir de un string para Capacitor.
+ * Canales de notificación configurados para Android 8.0+ (API 26+)
+ */
+export const NOTIFICATION_CHANNELS = [
+  {
+    id: REMINDER_CHANNELS.DAILY_LOG,
+    name: 'Registro diario',
+    description: 'Recordatorio nocturno para registrar tus gastos del día',
+    importance: 3, // Default
+    visibility: 1, // Private
+  },
+  {
+    id: REMINDER_CHANNELS.PAYMENTS,
+    name: 'Pagos y Cortes',
+    description: 'Fechas de corte, límites de pago de tarjetas y gastos fijos',
+    importance: 4, // High
+    visibility: 1,
+  },
+  {
+    id: REMINDER_CHANNELS.DEBTS,
+    name: 'Deudas y Préstamos',
+    description: 'Recordatorios de cobros pendientes y fechas de pago de préstamos',
+    importance: 4, // High
+    visibility: 1,
+  },
+  {
+    id: REMINDER_CHANNELS.BACKUP,
+    name: 'Respaldo',
+    description: 'Recordatorio semanal para respaldar tu información financiera',
+    importance: 2, // Low
+    visibility: 1,
+  },
+]
+
+/**
+ * Genera un ID numérico entero determinista de 32 bits a partir de un string para Capacitor.
  * @param {string} str
  * @returns {number}
  */
-function hashToInteger(str) {
+export function hashToInteger(str) {
   let hash = 0
   for (let i = 0; i < str.length; i++) {
     hash = (hash << 5) - hash + str.charCodeAt(i)
@@ -27,131 +75,196 @@ function hashToInteger(str) {
 }
 
 /**
- * Solicita permisos de notificación al usuario.
- * @returns {Promise<boolean>}
+ * Obtiene la referencia al plugin de Capacitor LocalNotifications de forma segura.
+ * @returns {Promise<Object|null>}
  */
-export async function requestNotificationPermissions() {
+async function getLocalNotificationsPlugin() {
   try {
     const notifPkg = '@capacitor/local-notifications'
     const notifModule = await import(/* @vite-ignore */ notifPkg).catch(() => null)
-    const LocalNotifications = notifModule?.LocalNotifications || (typeof window !== 'undefined' ? window.Capacitor?.Plugins?.LocalNotifications : null)
-    if (!LocalNotifications) return false
-
-    const status = await LocalNotifications.checkPermissions()
-    if (status.display === 'granted') return true
-
-    const req = await LocalNotifications.requestPermissions()
-    return req.display === 'granted'
+    return notifModule?.LocalNotifications || (typeof window !== 'undefined' ? window.Capacitor?.Plugins?.LocalNotifications : null)
   } catch {
-    // Fallback a Web Notifications si está disponible
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      const perm = await Notification.requestPermission()
-      return perm === 'granted'
+    return null
+  }
+}
+
+/**
+ * Crea y actualiza los canales de notificación en Android.
+ * @returns {Promise<void>}
+ */
+export async function ensureNotificationChannels() {
+  const LocalNotifications = await getLocalNotificationsPlugin()
+  if (!LocalNotifications || typeof LocalNotifications.createChannel !== 'function') {
+    return
+  }
+
+  try {
+    for (const channel of NOTIFICATION_CHANNELS) {
+      await LocalNotifications.createChannel(channel)
+    }
+  } catch (err) {
+    console.warn('[notifications] Error al crear canales de notificación:', err)
+  }
+}
+
+/**
+ * Consulta el estado actual de los permisos de notificación.
+ * @returns {Promise<'granted'|'denied'|'prompt'|'unavailable'>}
+ */
+export async function checkNotificationPermissions() {
+  const LocalNotifications = await getLocalNotificationsPlugin()
+  if (LocalNotifications && typeof LocalNotifications.checkPermissions === 'function') {
+    try {
+      const status = await LocalNotifications.checkPermissions()
+      return status?.display || 'prompt'
+    } catch {
+      // Ignorar y pasar a fallback
     }
   }
+
+  // Fallback web
+  if (typeof window !== 'undefined' && 'Notification' in window) {
+    if (Notification.permission === 'granted') return 'granted'
+    if (Notification.permission === 'denied') return 'denied'
+    return 'prompt'
+  }
+
+  return 'unavailable'
+}
+
+/**
+ * Solicita permisos de notificación al sistema operativo.
+ * @returns {Promise<boolean>}
+ */
+export async function requestNotificationPermissions() {
+  const LocalNotifications = await getLocalNotificationsPlugin()
+  if (LocalNotifications && typeof LocalNotifications.requestPermissions === 'function') {
+    try {
+      const req = await LocalNotifications.requestPermissions()
+      return req?.display === 'granted'
+    } catch (err) {
+      console.warn('[notifications] Error solicitando permisos nativos:', err)
+    }
+  }
+
+  // Fallback a Web Notifications si está disponible
+  if (typeof window !== 'undefined' && 'Notification' in window) {
+    try {
+      const perm = await Notification.requestPermission()
+      return perm === 'granted'
+    } catch {
+      return false
+    }
+  }
+
   return false
 }
 
 /**
- * Programa los recordatorios de fecha de corte y pago de tarjetas de crédito,
- * así como los gastos fijos mensuales pendientes.
+ * Reprograma todo el calendario de recordatorios para los próximos 7 días.
+ * Cancela las notificaciones previas y programa las nuevas con IDs únicos sin duplicación.
  *
- * @param {Object} params
- * @param {Array<Object>} [params.accounts=[]] - Cuentas de crédito con campo credit { cutDay, payDay }
- * @param {Array<Object>} [params.pendingRecurring=[]] - Elementos de pendingRecurring con dueDate y fixedExpense
+ * Se invoca:
+ *   1. Al abrir la app.
+ *   2. Al registrar un nuevo movimiento (cancela el diario de hoy).
+ *   3. Al cambiar los ajustes de recordatorios.
+ *   4. Al modificar gastos fijos, tarjetas, deudas o ingresos recurrentes.
+ *
+ * @param {Object} [customState] - Estado opcional para omitir lecturas a Dexie
  * @returns {Promise<{ scheduledCount: number, error?: string }>}
  */
-export async function scheduleFinancialReminders({
-  accounts = [],
-  pendingRecurring = [],
-} = {}) {
+export async function rescheduleAll(customState = null) {
   try {
-    const notifPkg = '@capacitor/local-notifications'
-    const notifModule = await import(/* @vite-ignore */ notifPkg).catch(() => null)
-    const LocalNotifications = notifModule?.LocalNotifications || (typeof window !== 'undefined' ? window.Capacitor?.Plugins?.LocalNotifications : null)
+    const LocalNotifications = await getLocalNotificationsPlugin()
     if (!LocalNotifications) {
       return { scheduledCount: 0, error: 'Módulo de notificaciones locales no disponible.' }
     }
 
-    const hasPerm = await requestNotificationPermissions()
-    if (!hasPerm) {
+    // Asegurar que los canales de Android existan
+    await ensureNotificationChannels()
+
+    // Verificar permisos
+    const permStatus = await checkNotificationPermissions()
+    if (permStatus !== 'granted') {
       return { scheduledCount: 0, error: 'Permisos de notificación no otorgados.' }
     }
 
-    const notificationsToSchedule = []
-    const now = new Date()
-    const currentYear = now.getFullYear()
-    const currentMonth = now.getMonth()
+    // Cargar estado desde Dexie si no se proporcionó
+    let state = customState
+    let settings = customState?.settings || null
 
-    // 1. Recordatorios para tarjetas de crédito (Corte y Pago)
-    const creditCards = accounts.filter(a => a.type === 'credit' && a.credit)
+    if (!state) {
+      const todayStr = toISODate(new Date())
+      const currentMonthPrefix = todayStr.slice(0, 7) // 'YYYY-MM'
 
-    for (const card of creditCards) {
-      const { cutDay, payDay } = card.credit
+      const [
+        accounts,
+        fixedExpenses,
+        recurringIncomes,
+        debts,
+        debtPayments,
+        todayMovements,
+        monthMovements,
+        dbSettings,
+      ] = await Promise.all([
+        db.accounts.toArray().catch(() => []),
+        db.fixedExpenses.toArray().catch(() => []),
+        db.recurringIncomes ? db.recurringIncomes.toArray().catch(() => []) : [],
+        db.debts ? db.debts.toArray().catch(() => []) : [],
+        db.debtPayments ? db.debtPayments.toArray().catch(() => []) : [],
+        db.movements.where('date').equals(todayStr).toArray().catch(() => []),
+        db.movements.where('date').between(`${currentMonthPrefix}-01`, `${currentMonthPrefix}-31`, true, true).toArray().catch(() => []),
+        db.settings.get('global').catch(() => null),
+      ])
 
-      // Recordatorio de corte
-      if (cutDay >= 1 && cutDay <= 31) {
-        const cutDate = new Date(currentYear, currentMonth, cutDay, 9, 0, 0)
-        // Si ya pasó este mes, programar para el mes siguiente
-        if (cutDate < now) {
-          cutDate.setMonth(cutDate.getMonth() + 1)
-        }
+      // Identificar gastos fijos ya pagados en el mes actual
+      const paidFixedExpenseIdsThisMonth = monthMovements
+        .filter(m => m.fixedId)
+        .map(m => m.fixedId)
 
-        notificationsToSchedule.push({
-          id: hashToInteger(`cut-${card.id}-${cutDay}`),
-          title: `Corte de tarjeta: ${card.name}`,
-          body: `Hoy es el corte de tu tarjeta ${card.name}. Revisa tus movimientos para el nuevo periodo.`,
-          schedule: { at: cutDate },
-          sound: null,
-          extra: { type: 'credit_cut', cardId: card.id },
-        })
-      }
-
-      // Recordatorio de fecha límite de pago
-      if (payDay >= 1 && payDay <= 31) {
-        const payDate = new Date(currentYear, currentMonth, payDay, 9, 0, 0)
-        if (payDate < now) {
-          payDate.setMonth(payDate.getMonth() + 1)
-        }
-
-        const balanceText = card.balance > 0 ? ` (Deuda actual: ${formatMoney(card.balance)})` : ''
-        notificationsToSchedule.push({
-          id: hashToInteger(`pay-${card.id}-${payDay}`),
-          title: `Fecha límite de pago: ${card.name}`,
-          body: `Hoy es el día límite para pagar tu tarjeta ${card.name}${balanceText}.`,
-          schedule: { at: payDate },
-          sound: null,
-          extra: { type: 'credit_pay', cardId: card.id },
-        })
-      }
-    }
-
-    // 2. Recordatorios de gastos fijos pendientes
-    for (const item of pendingRecurring) {
-      const fixed = item.fixedExpense
-      const day = fixed.dayOfMonth || 1
-      const dueDate = new Date(currentYear, currentMonth, day, 10, 0, 0)
-
-      if (dueDate >= now) {
-        notificationsToSchedule.push({
-          id: hashToInteger(`fixed-${fixed.id}-${item.dueDate}`),
-          title: `Gasto fijo pendiente: ${fixed.name}`,
-          body: `Hoy vence ${fixed.name} (${formatMoney(fixed.amount)}). Confirma tu pago en Finanzas.`,
-          schedule: { at: dueDate },
-          sound: null,
-          extra: { type: 'fixed_expense', fixedId: fixed.id },
-        })
+      settings = dbSettings || {}
+      state = {
+        accounts,
+        fixedExpenses,
+        paidFixedExpenseIdsThisMonth,
+        recurringIncomes,
+        debts,
+        debtPayments,
+        movementsToday: todayMovements,
+        hasMovementToday: todayMovements.length > 0,
+        lastBackupAt: settings.lastBackupAt || null,
+        settings,
       }
     }
 
-    // Cancelar previas y programar nuevas si hay
+    // Generar la agenda pura de los próximos 7 días
+    const scheduleItems = computeSchedule(settings || state.settings || {}, state, new Date())
+
+    // Convertir al formato de Capacitor LocalNotifications
+    const notificationsToSchedule = scheduleItems.map(item => ({
+      id: hashToInteger(item.id),
+      title: item.title,
+      body: item.body,
+      channelId: item.channelId,
+      schedule: {
+        at: item.scheduledAt,
+        allowWhileIdle: true, // Programación no exacta, no requiere SCHEDULE_EXACT_ALARM
+      },
+      sound: null,
+      extra: {
+        ...item.extra,
+        route: item.route,
+      },
+    }))
+
+    // Cancelar todas las notificaciones pendientes existentes para no duplicar
+    const pendingList = await LocalNotifications.getPending().catch(() => null)
+    if (pendingList?.notifications?.length > 0) {
+      await LocalNotifications.cancel({ notifications: pendingList.notifications }).catch(() => null)
+    }
+
+    // Programar nuevas notificaciones
     if (notificationsToSchedule.length > 0) {
-      // Cancelar notificaciones pendientes existentes
-      const pendingList = await LocalNotifications.getPending()
-      if (pendingList?.notifications?.length > 0) {
-        await LocalNotifications.cancel({ notifications: pendingList.notifications })
-      }
-
       await LocalNotifications.schedule({
         notifications: notificationsToSchedule,
       })
@@ -159,7 +272,103 @@ export async function scheduleFinancialReminders({
 
     return { scheduledCount: notificationsToSchedule.length }
   } catch (err) {
-    console.warn('[notificationsService] No se pudieron programar recordatorios nativos:', err.message)
+    console.warn('[notifications] Error al reprogramar recordatorios:', err)
     return { scheduledCount: 0, error: err.message }
   }
 }
+
+/**
+ * Envía una notificación de prueba inmediata para validar que el sistema funcione.
+ *
+ * @param {string} [channelId='daily_log']
+ * @returns {Promise<{ success: boolean, error?: string }>}
+ */
+export async function sendTestNotification(channelId = REMINDER_CHANNELS.DAILY_LOG) {
+  try {
+    const LocalNotifications = await getLocalNotificationsPlugin()
+    if (!LocalNotifications) {
+      return { success: false, error: 'Módulo de notificaciones locales no disponible.' }
+    }
+
+    const hasPerm = await requestNotificationPermissions()
+    if (!hasPerm) {
+      return { success: false, error: 'Permisos de notificación no otorgados.' }
+    }
+
+    await ensureNotificationChannels()
+
+    const channelObj = NOTIFICATION_CHANNELS.find(c => c.id === channelId) || NOTIFICATION_CHANNELS[0]
+
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: hashToInteger(`test-${Date.now()}`),
+          title: 'Notificación de prueba · Finanzas',
+          body: `El canal "${channelObj.name}" está activo y funcionando en tu dispositivo.`,
+          channelId: channelObj.id,
+          schedule: { at: new Date(Date.now() + 1000) }, // 1 segundo después
+          extra: { route: '/ajustes' },
+        },
+      ],
+    })
+
+    return { success: true }
+  } catch (err) {
+    console.warn('[notifications] Error al enviar notificación de prueba:', err)
+    return { success: false, error: err.message }
+  }
+}
+
+/**
+ * Configura el listener global que maneja el toque sobre una notificación
+ * y redirige a la pantalla correspondiente.
+ *
+ * @param {Function} navigate - Función navigate de react-router
+ * @param {Function} [isAppLockedFn] - Función opcional que retorna si la app está bloqueada
+ * @returns {Promise<Function>} Función para remover el listener al desmontar
+ */
+let pendingNotificationRoute = null
+
+export function getPendingNotificationRoute() {
+  return pendingNotificationRoute
+}
+
+export function clearPendingNotificationRoute() {
+  pendingNotificationRoute = null
+}
+
+export async function setupNotificationNavigationListener(navigate, isAppLockedFn = null) {
+  const LocalNotifications = await getLocalNotificationsPlugin()
+  if (!LocalNotifications || typeof LocalNotifications.addListener !== 'function') {
+    return () => {}
+  }
+
+  try {
+    const handle = await LocalNotifications.addListener(
+      'localNotificationActionPerformed',
+      (notificationAction) => {
+        const route = notificationAction?.notification?.extra?.route || '/registrar'
+
+        // Si la app está bloqueada, guardar la ruta pendiente y esperar al desbloqueo
+        if (typeof isAppLockedFn === 'function' && isAppLockedFn()) {
+          pendingNotificationRoute = route
+          return
+        }
+
+        if (typeof navigate === 'function') {
+          navigate(route)
+        }
+      }
+    )
+
+    return () => {
+      handle.remove?.()
+    }
+  } catch (err) {
+    console.warn('[notifications] No se pudo registrar el listener de navegación:', err)
+    return () => {}
+  }
+}
+
+// Mantener compatibilidad hacia atrás
+export const scheduleFinancialReminders = rescheduleAll

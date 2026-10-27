@@ -31,12 +31,13 @@ import {
   Calendar,
   Check,
   CreditCard,
+  Bookmark,
 } from 'lucide-react'
 import AmountInput from './AmountInput.jsx'
 import CardPicker from '../wallet/CardPicker.jsx'
 import Button from '../ui/Button.jsx'
 import { ALLOWED_MSI_MONTHS } from '../../domain/msi.js'
-import { formatMoney } from '../../lib/format.js'
+import { formatMoney, todayLocalISO, yesterdayLocalISO } from '../../lib/format.js'
 
 // Mapa de íconos por nombre en lucide-react
 const ICON_MAP = {
@@ -69,7 +70,7 @@ export default function MovementForm({
   const [toAccountId, setToAccountId] = useState(initialMovement?.toAccountId || '')
   const [categoryId, setCategoryId] = useState(initialMovement?.categoryId || '')
   const [date, setDate] = useState(
-    initialMovement?.date || new Date().toISOString().slice(0, 10)
+    initialMovement?.date || todayLocalISO()
   )
   const [note, setNote] = useState(initialMovement?.note || '')
   const [errorMsg, setErrorMsg] = useState('')
@@ -77,6 +78,28 @@ export default function MovementForm({
   // Estado para Meses Sin Intereses (MSI)
   const [isMsi, setIsMsi] = useState(Boolean(initialMovement?.msi))
   const [msiMonths, setMsiMonths] = useState(initialMovement?.msi?.months || 3)
+
+  // Guardar como plantilla
+  const [saveAsTemplate, setSaveAsTemplate] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+
+  // Sincronizar campos cuando cambia initialMovement (p. ej. al aplicar plantilla en 'fill')
+  useEffect(() => {
+    if (initialMovement) {
+      if (initialMovement.type) setType(initialMovement.type)
+      setAmountCents(initialMovement.amount !== undefined ? initialMovement.amount : 0)
+      if (initialMovement.currency) setCurrency(initialMovement.currency)
+      if (initialMovement.accountId) setAccountId(initialMovement.accountId)
+      if (initialMovement.toAccountId) setToAccountId(initialMovement.toAccountId)
+      if (initialMovement.categoryId) setCategoryId(initialMovement.categoryId)
+      if (initialMovement.date) setDate(initialMovement.date)
+      setNote(initialMovement.note || '')
+      setIsMsi(Boolean(initialMovement.msi))
+      setMsiMonths(initialMovement.msi?.months || 3)
+      setSaveAsTemplate(false)
+      setTemplateName('')
+    }
+  }, [initialMovement])
 
   // Preseleccionar cuenta sugerida si no hay una seleccionada
   useEffect(() => {
@@ -112,8 +135,8 @@ export default function MovementForm({
     }
   }, [type, categoryId, filteredCategories])
 
-  const todayStr = new Date().toISOString().slice(0, 10)
-  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  const todayStr = todayLocalISO()
+  const yesterdayStr = yesterdayLocalISO()
 
   // Monto mensual estimado para MSI
   const monthlyMsiCents = isMsi && amountCents > 0
@@ -168,12 +191,17 @@ export default function MovementForm({
         date,
         note: note.trim(),
         msi: msiData,
+      }, {
+        saveAsTemplate: !isEditing && saveAsTemplate,
+        templateName: templateName.trim(),
       })
 
       if (!isEditing) {
         setAmountCents(0)
         setNote('')
         setIsMsi(false)
+        setSaveAsTemplate(false)
+        setTemplateName('')
       }
     } catch (err) {
       setErrorMsg(err.message || 'Error al guardar el movimiento.')
@@ -338,7 +366,8 @@ export default function MovementForm({
           <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-2">
             Categoría
           </label>
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 max-h-48 overflow-y-auto p-1 scrollbar-none">
+          {/* Sin scroll anidado: el formulario completo es el contenedor con scroll */}
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 p-1">
             {filteredCategories.map((cat) => {
               const isSelected = categoryId === cat.id
               const IconComp = ICON_MAP[cat.icon] || MoreHorizontal
@@ -431,24 +460,68 @@ export default function MovementForm({
             }}
           />
         </div>
+
+        {/* Opción para guardar como plantilla */}
+        {!isEditing && (
+          <div className="pt-1 flex flex-col gap-2">
+            <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-[var(--text-secondary)] hover:text-white transition-colors">
+              <input
+                type="checkbox"
+                checked={saveAsTemplate}
+                onChange={(e) => setSaveAsTemplate(e.target.checked)}
+                className="w-4 h-4 rounded text-[var(--orange-400)] accent-[var(--orange-400)] cursor-pointer"
+              />
+              <span className="font-medium flex items-center gap-1.5">
+                <Bookmark size={13} className="text-[var(--orange-400)]" />
+                Guardar también como plantilla frecuente
+              </span>
+            </label>
+            {saveAsTemplate && (
+              <input
+                type="text"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="Nombre de la plantilla (ej: Café diario, Gasolina)"
+                className="w-full px-3 py-2 rounded-lg text-xs text-white outline-none animate-in fade-in duration-150"
+                style={{
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--orange-400)',
+                }}
+              />
+            )}
+          </div>
+        )}
       </div>
 
-      {/* ── Botón Guardar ── */}
-      <div className="flex items-center justify-end gap-3 pt-2">
-        {isEditing && (
+      {/* ── Botón Guardar (fijo encima de la barra inferior cuando no está en modal de edición) ── */}
+      {isEditing ? (
+        <div className="flex items-center justify-end gap-3 pt-2">
           <Button variant="ghost" onClick={onCancel}>
             Cancelar
           </Button>
-        )}
-        <Button
-          variant="primary"
-          type="submit"
-          className="w-full sm:w-auto"
-          icon={Check}
-        >
-          {isEditing ? 'Guardar cambios' : 'Registrar movimiento'}
-        </Button>
-      </div>
+          <Button
+            variant="primary"
+            type="submit"
+            className="w-full sm:w-auto"
+            icon={Check}
+          >
+            Guardar cambios
+          </Button>
+        </div>
+      ) : (
+        <div className="pt-3">
+          <Button
+            variant="primary"
+            type="submit"
+            size="lg"
+            className="w-full text-base font-semibold shadow-md"
+            icon={Check}
+            style={{ minHeight: '48px', height: '48px' }}
+          >
+            Registrar movimiento
+          </Button>
+        </div>
+      )}
     </form>
   )
 }

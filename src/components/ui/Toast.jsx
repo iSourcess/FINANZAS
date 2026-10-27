@@ -10,6 +10,7 @@ import { CheckCircle2, RotateCcw, X } from 'lucide-react'
 export default function Toast({
   message,
   onUndo,
+  action,
   onClose,
   duration = 5000,
 }) {
@@ -26,7 +27,7 @@ export default function Toast({
   return (
     <div
       role="alert"
-      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-sm rounded-xl p-3.5 shadow-2xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200"
+      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-md rounded-xl p-3.5 shadow-2xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200"
       style={{
         background: 'var(--bg-elevated)',
         border: '1px solid var(--border-default)',
@@ -40,6 +41,17 @@ export default function Toast({
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0">
+        {action && (
+          <button
+            type="button"
+            onClick={action.onClick}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-[var(--orange-400)] hover:bg-[var(--orange-900)] transition-colors active:scale-95"
+            style={{ minHeight: '32px' }}
+          >
+            {action.icon && <action.icon size={13} />}
+            <span>{action.label}</span>
+          </button>
+        )}
         {onUndo && (
           <button
             type="button"

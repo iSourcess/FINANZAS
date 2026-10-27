@@ -78,6 +78,8 @@ export function calculateHoldingPerformance({
  * @param {Array<Object>} [params.holdings=[]] - Posiciones de inversión
  * @param {Map|Object} [params.priceMap={}] - Mapa de symbol -> { price, currency, change24h, isStale }
  * @param {number} [params.fxRate=1] - Tipo de cambio USD a MXN
+ * @param {boolean} [params.includeDebtsInNetWorth=false] - Si se incluyen deudas y préstamos
+ * @param {Object} [params.debtsSummary=null] - { totalOwedToMeMXN, totalIOweMXN }
  * @returns {Object} Resumen consolidado del patrimonio
  */
 export function calculateNetWorth({
@@ -85,6 +87,8 @@ export function calculateNetWorth({
   holdings = [],
   priceMap = {},
   fxRate = 1,
+  includeDebtsInNetWorth = false,
+  debtsSummary = null,
 }) {
   const rate = Math.max(0.0001, Number(fxRate) || 1)
 
@@ -141,8 +145,13 @@ export function calculateNetWorth({
     ? Number((((investmentsCents - investmentsCostCents) / investmentsCostCents) * 100).toFixed(2))
     : 0
 
-  // 3. Patrimonio total = Efectivo + Débito + Inversiones - Deuda
-  const netWorthCents = cashCents + debitCents + investmentsCents - debtCents
+  // 3. Deudas y préstamos
+  const debtsOwedToMeMXN = debtsSummary?.totalOwedToMeMXN || 0
+  const debtsIOweMXN = debtsSummary?.totalIOweMXN || 0
+  const debtsNetMXN = debtsOwedToMeMXN - debtsIOweMXN
+
+  // 4. Patrimonio total = Efectivo + Débito + Inversiones - Deuda de crédito + (si activo: Me deben - Debo)
+  const netWorthCents = cashCents + debitCents + investmentsCents - debtCents + (includeDebtsInNetWorth ? debtsNetMXN : 0)
 
   return {
     cashCents,
@@ -155,5 +164,10 @@ export function calculateNetWorth({
     netWorthCents,
     holdingsCalculated,
     fxRate: rate,
+    includeDebtsInNetWorth,
+    debtsOwedToMeMXN,
+    debtsIOweMXN,
+    debtsNetMXN,
   }
 }
+

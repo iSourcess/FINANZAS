@@ -5,14 +5,27 @@
  *
  * Convención:
  *   - Montos en CENTAVOS ENTEROS.
- *   - fxRate es el tipo de cambio: MXN por 1 USD (ej: 20.0).
+ *   - fxRate es el tipo de cambio: MXN por 1 divisa extranjera (ej: USD a 20.0, EUR a 21.5).
  *     Si viene en centavos (ej: 2000), se normaliza dividiendo entre 100.
+ *   - Si no se proporciona fxRate, consulta al proveedor de tipo de cambio activo (useFx).
  */
 
+let activeRateProvider = null
+
 /**
- * Convierte un monto entre MXN y USD usando un tipo de cambio dado.
+ * Registra el proveedor de tasa activa del store useFx para conversiones sin tasa explícita.
+ * @param {(currency: string) => number} fn
+ */
+export function setRateProvider(fn) {
+  activeRateProvider = fn
+}
+
+/**
+ * Convierte un monto entre MXN y divisas extranjeras (USD, EUR, etc.) usando un tipo de cambio dado
+ * o la tasa activa del store useFx como fuente única de verdad.
+ *
  * @param {number} amountCents - Monto en centavos enteros
- * @param {number} fxRate - Tipo de cambio (MXN por 1 USD, ej: 20.0 o 2000 centavos)
+ * @param {number} [fxRate] - Tipo de cambio (MXN por 1 unidad de divisa extranjera)
  * @param {string} [fromCurrency='MXN']
  * @param {string} [toCurrency='MXN']
  * @returns {number} Monto resultante en centavos enteros redondeados
@@ -28,17 +41,27 @@ export function convertCurrency(
   }
 
   // Normalizar fxRate si viene en centavos (ej: 2000 centavos = $20.00 MXN/USD)
-  const rate = fxRate > 100 ? fxRate / 100 : fxRate
+  let rate = fxRate > 100 ? fxRate / 100 : fxRate
+
+  // Si no se pasó fxRate, obtener de la fuente única de verdad (useFx)
+  if (!rate || rate <= 0) {
+    const foreignCurrency = fromCurrency === 'MXN' ? toCurrency : fromCurrency
+    if (typeof activeRateProvider === 'function') {
+      rate = activeRateProvider(foreignCurrency)
+    }
+  }
 
   if (!rate || rate <= 0) {
     return Math.round(amountCents)
   }
 
-  if (fromCurrency === 'USD' && toCurrency === 'MXN') {
+  // De divisa extranjera (USD/EUR) a MXN
+  if (toCurrency === 'MXN') {
     return Math.round(amountCents * rate)
   }
 
-  if (fromCurrency === 'MXN' && toCurrency === 'USD') {
+  // De MXN a divisa extranjera (USD/EUR)
+  if (fromCurrency === 'MXN') {
     return Math.round(amountCents / rate)
   }
 

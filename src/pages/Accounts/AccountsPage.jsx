@@ -10,18 +10,24 @@
  */
 
 import { useEffect, useState, useMemo } from 'react'
-import { Plus, Wallet, TrendingUp, TrendingDown, ShieldCheck, CandlestickChart } from 'lucide-react'
+import { Plus, Wallet, TrendingUp, TrendingDown, ShieldCheck, CandlestickChart, HandCoins } from 'lucide-react'
 import { useAccounts } from '../../store/useAccounts.js'
 import { useMovements } from '../../store/useMovements.js'
 import { useInvestments } from '../../store/useInvestments.js'
+import { useDebts } from '../../store/useDebts.js'
+import { useSettings } from '../../store/useSettings.js'
 import CardStack from '../../components/wallet/CardStack.jsx'
 import AccountDetailModal from '../../components/wallet/AccountDetailModal.jsx'
 import AccountForm from '../../components/forms/AccountForm.jsx'
 import MovementForm from '../../components/forms/MovementForm.jsx'
 import HoldingsList from '../../components/investments/HoldingsList.jsx'
+import DebtsSection from '../../components/debts/DebtsSection.jsx'
+import DebtFormModal from '../../components/debts/DebtFormModal.jsx'
+import DebtPaymentModal from '../../components/debts/DebtPaymentModal.jsx'
 import Modal from '../../components/ui/Modal.jsx'
 import Button from '../../components/ui/Button.jsx'
 import { calculateNetWorth } from '../../domain/netWorth.js'
+import { calculateDebtsSummary } from '../../domain/debts.js'
 import { formatMoney } from '../../lib/format.js'
 
 export default function AccountsPage() {
@@ -49,7 +55,23 @@ export default function AccountsPage() {
     deleteHolding,
   } = useInvestments()
 
-  const [activeTab, setActiveTab] = useState('wallet') // 'wallet' | 'investments'
+  const {
+    debts,
+    debtPayments,
+    loading: loadingDebts,
+    fetchDebts,
+    addDebt,
+    updateDebt,
+    deleteDebt,
+    settleDebt,
+    reopenDebt,
+    addPayment,
+    deletePayment,
+  } = useDebts()
+
+  const { settings, fetchSettings } = useSettings()
+
+  const [activeTab, setActiveTab] = useState('wallet') // 'wallet' | 'investments' | 'debts'
 
   // Modales
   const [selectedAccount, setSelectedAccount] = useState(null)
@@ -57,34 +79,64 @@ export default function AccountsPage() {
   const [editingAccount, setEditingAccount] = useState(null)
   const [payingCard, setPayingCard] = useState(null)
 
+  // Modales de deudas
+  const [isDebtModalOpen, setIsDebtModalOpen] = useState(false)
+  const [editingDebt, setEditingDebt] = useState(null)
+  const [payingDebt, setPayingDebt] = useState(null)
+
   const { addMovement } = useMovements()
 
-  // Cargar cuentas e inversiones de Dexie al montar
+  // Cargar cuentas, inversiones, deudas y ajustes de Dexie al montar
   useEffect(() => {
     fetchAccounts()
     fetchHoldings()
-  }, [fetchAccounts, fetchHoldings])
+    fetchDebts()
+    fetchSettings()
+  }, [fetchAccounts, fetchHoldings, fetchDebts, fetchSettings])
+
+  // ── Resumen de Deudas ──
+  const debtsSummary = useMemo(() => {
+    return calculateDebtsSummary({
+      debts,
+      payments: debtPayments,
+      fxRate,
+    })
+  }, [debts, debtPayments, fxRate])
 
   // ── Cálculo del Patrimonio Total Consolidado ──
-  // Patrimonio = Efectivo + Débito/Ahorro + Inversiones − Deuda de crédito
+  // Patrimonio = Efectivo + Débito/Ahorro + Inversiones − Deuda de crédito (± Deudas si está activo en ajustes)
+  const includeDebts = Boolean(settings?.includeDebtsInNetWorth)
   const netWorthSummary = useMemo(() => {
     return calculateNetWorth({
       accounts,
       holdings,
       priceMap,
       fxRate,
+      debtsSummary,
+      includeDebtsInNetWorth: includeDebts,
     })
-  }, [accounts, holdings, priceMap, fxRate])
+  }, [accounts, holdings, priceMap, fxRate, debtsSummary, includeDebts])
+
+  const [selectedParentId, setSelectedParentId] = useState(null)
 
   // Abrir modal de creación de cuenta
   const handleOpenCreate = () => {
     setEditingAccount(null)
+    setSelectedParentId(null)
     setIsFormOpen(true)
   }
 
   // Abrir modal de edición desde detalle
   const handleOpenEdit = (acc) => {
     setEditingAccount(acc)
+    setSelectedParentId(acc?.parentId || null)
+    setIsFormOpen(true)
+  }
+
+  // Abrir modal de creación de caja vinculada desde detalle de tarjeta de débito
+  const handleOpenAddCaja = (parentId) => {
+    setEditingAccount(null)
+    setSelectedParentId(parentId)
     setIsFormOpen(true)
   }
 
@@ -125,6 +177,20 @@ export default function AccountsPage() {
             onClick={handleOpenCreate}
           >
             Nueva cuenta
+          </Button>
+        )}
+
+        {activeTab === 'debts' && (
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={() => {
+              setEditingDebt(null)
+              setIsDebtModalOpen(true)
+            }}
+          >
+            Nueva deuda
           </Button>
         )}
       </div>
@@ -182,12 +248,14 @@ export default function AccountsPage() {
             {formatMoney(netWorthSummary.netWorthCents)}
           </span>
           <span className="text-xs text-[var(--text-muted)] mt-1 block">
-            Efectivo + Débito + Inversiones − Deuda en tarjetas
+            {includeDebts
+              ? 'Efectivo + Débito + Inversiones − Deuda tarjetas ± Deudas personales'
+              : 'Efectivo + Débito + Inversiones − Deuda en tarjetas'}
           </span>
         </div>
 
-        {/* ── Desglose de Activos, Inversiones y Deuda ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+        {/* ── Desglose de Activos, Inversiones, Deuda y Préstamos ── */}
+        <div className={`grid grid-cols-1 ${includeDebts ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3 pt-4 border-t`} style={{ borderColor: 'var(--border-subtle)' }}>
           {/* Activos Bancarios (Efectivo + Débito) */}
           <div
             className="p-3 rounded-xl"
@@ -267,10 +335,41 @@ export default function AccountsPage() {
               {formatMoney(netWorthSummary.debtCents)}
             </span>
           </div>
+
+          {/* Deudas Personales (si está habilitado en Ajustes) */}
+          {includeDebts && (
+            <div
+              className="p-3 rounded-xl"
+              style={{
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-subtle)',
+              }}
+            >
+              <div className="flex items-center justify-between gap-1 text-xs text-[var(--text-secondary)] mb-1">
+                <div className="flex items-center gap-1.5">
+                  <HandCoins size={14} className="text-[var(--orange-400)]" />
+                  <span>Deudas neto</span>
+                </div>
+                <span className="text-[10px] text-[var(--text-muted)]">
+                  {debtsSummary.openDebtsCount} activas
+                </span>
+              </div>
+              <span
+                className="block font-bold text-base sm:text-lg"
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  color: (debtsSummary.netMXNCents || 0) >= 0 ? 'var(--orange-400)' : 'var(--red-400)',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {(debtsSummary.netMXNCents || 0) > 0 ? '+' : ''}{formatMoney(debtsSummary.netMXNCents || 0)}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── Selector de Pestañas: Billetera vs Inversiones ── */}
+      {/* ── Selector de Pestañas: Billetera vs Inversiones vs Deudas ── */}
       <div className="flex rounded-xl p-1 bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
         <button
           onClick={() => setActiveTab('wallet')}
@@ -294,6 +393,18 @@ export default function AccountsPage() {
         >
           <CandlestickChart size={15} />
           <span>Inversiones ({holdings.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('debts')}
+          className={`flex-1 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition-colors ${
+            activeTab === 'debts'
+              ? 'bg-[var(--orange-500)] text-black'
+              : 'text-[var(--text-secondary)] hover:text-white'
+          }`}
+        >
+          <HandCoins size={15} />
+          <span>Deudas ({debts.filter((d) => d.status === 'open').length})</span>
         </button>
       </div>
 
@@ -328,7 +439,7 @@ export default function AccountsPage() {
             />
           )}
         </section>
-      ) : (
+      ) : activeTab === 'investments' ? (
         <section className="flex flex-col gap-3">
           <HoldingsList
             holdingsCalculated={netWorthSummary.holdingsCalculated}
@@ -340,6 +451,28 @@ export default function AccountsPage() {
             onAddHolding={addHolding}
             onUpdateHolding={updateHolding}
             onDeleteHolding={deleteHolding}
+          />
+        </section>
+      ) : (
+        <section className="flex flex-col gap-3">
+          <DebtsSection
+            debts={debts}
+            debtPayments={debtPayments}
+            fxRate={fxRate}
+            loading={loadingDebts}
+            onNewDebt={() => {
+              setEditingDebt(null)
+              setIsDebtModalOpen(true)
+            }}
+            onEditDebt={(d) => {
+              setEditingDebt(d)
+              setIsDebtModalOpen(true)
+            }}
+            onDeleteDebt={deleteDebt}
+            onSettleDebt={settleDebt}
+            onReopenDebt={reopenDebt}
+            onRecordPayment={(d) => setPayingDebt(d)}
+            onDeletePayment={deletePayment}
           />
         </section>
       )}
@@ -358,6 +491,7 @@ export default function AccountsPage() {
           setSelectedAccount(null)
           setPayingCard(acc)
         }}
+        onAddCaja={handleOpenAddCaja}
       />
 
       {/* ── Modal para Pagar Tarjeta (Transferencia desde Débito) ── */}
@@ -385,15 +519,51 @@ export default function AccountsPage() {
         </Modal>
       )}
 
-      {/* ── Modal de Formulario (Crear / Editar) ── */}
+      {/* ── Modal de Formulario de Cuenta (Crear / Editar) ── */}
       <AccountForm
+        key={editingAccount ? `edit-${editingAccount.id}` : `new-${selectedParentId || 'root'}-${isFormOpen}`}
         account={editingAccount}
+        accounts={accounts}
+        initialParentId={selectedParentId}
         isOpen={isFormOpen}
         onClose={() => {
           setIsFormOpen(false)
           setEditingAccount(null)
+          setSelectedParentId(null)
         }}
         onSave={handleSaveAccount}
+      />
+
+      {/* ── Modal de Deuda (Crear / Editar) ── */}
+      <DebtFormModal
+        isOpen={isDebtModalOpen}
+        debt={editingDebt}
+        accounts={accounts}
+        onClose={() => {
+          setIsDebtModalOpen(false)
+          setEditingDebt(null)
+        }}
+        onSave={async (data, options) => {
+          if (editingDebt) {
+            await updateDebt(editingDebt.id, data)
+          } else {
+            await addDebt(data, options)
+          }
+        }}
+      />
+
+      {/* ── Modal para Registrar Abono a Deuda ── */}
+      <DebtPaymentModal
+        isOpen={Boolean(payingDebt)}
+        debt={payingDebt}
+        payments={debtPayments}
+        accounts={accounts}
+        onClose={() => setPayingDebt(null)}
+        onSave={async (data, options) => {
+          if (payingDebt) {
+            await addPayment(payingDebt.id, data, options)
+          }
+        }}
       />
     </div>
   )

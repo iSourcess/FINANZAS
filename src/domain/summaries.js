@@ -46,7 +46,7 @@ export function calculatePeriodSummaries({
 
   // ── Procesar periodo actual ──
   const currentMovements = movements.filter(m => {
-    if (m.type === 'transfer') return false
+    if (m.type === 'transfer' || m.type === 'adjustment') return false
     return isDateInRange(m.date, startDate, endDate)
   })
 
@@ -118,7 +118,7 @@ export function calculatePeriodSummaries({
 
   if (hasPrevPeriod) {
     const prevMovements = movements.filter(m => {
-      if (m.type === 'transfer') return false
+      if (m.type === 'transfer' || m.type === 'adjustment') return false
       return isDateInRange(m.date, prevStartDate, prevEndDate)
     })
 
@@ -135,14 +135,16 @@ export function calculatePeriodSummaries({
 
   const prevBalance = prevIncome - prevExpense
 
-  // Cálculo de variación porcentual y absoluta
+  // Cálculo de variación porcentual y absoluta.
+  // Si el periodo anterior no tiene datos (previous === 0), se marca como noPrevData
+  // para que la UI muestre "Sin datos del periodo anterior" en lugar de "+100%".
   const calculateChange = (current, previous) => {
     const diff = current - previous
     if (previous === 0) {
-      return { diff, percent: current > 0 ? 100 : 0 }
+      return { diff, percent: 0, noPrevData: true }
     }
     const percent = ((current - previous) / previous) * 100
-    return { diff, percent: Number(percent.toFixed(1)) }
+    return { diff, percent: Number(percent.toFixed(1)), noPrevData: false }
   }
 
   const incomeComparison = hasPrevPeriod ? calculateChange(totalIncome, prevIncome) : null

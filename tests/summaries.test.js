@@ -78,5 +78,37 @@ describe('Domain: summaries calculations', () => {
     // Ingresos subieron de 12k a 15k (+25%)
     expect(summary.comparison.income.percent).toBe(25)
     expect(summary.comparison.income.diff).toBe(300000)
+    expect(summary.comparison.income.noPrevData).toBe(false)
+  })
+
+  it('marks noPrevData as true when previous period has no data (total 0) instead of +100%', () => {
+    // Solo movimientos en el periodo actual, ninguno en el periodo anterior
+    const currentOnlyMovements = [
+      { id: 'm1', type: 'income', amount: 1000000, currency: 'MXN', date: '2026-10-01' },
+      { id: 'm2', type: 'expense', amount: 500000, currency: 'MXN', date: '2026-10-05' },
+    ]
+
+    const summary = calculatePeriodSummaries({
+      movements: currentOnlyMovements,
+      categories,
+      startDate: '2026-10-01',
+      endDate: '2026-10-31',
+      prevStartDate: '2026-09-01',
+      prevEndDate: '2026-09-30',
+    })
+
+    expect(summary.hasPrevPeriod).toBe(true)
+    expect(summary.previous.totalIncome).toBe(0)
+    expect(summary.previous.totalExpense).toBe(0)
+
+    // Al no haber datos en el periodo anterior, no debe mostrar +100% sino noPrevData: true
+    expect(summary.comparison.income.noPrevData).toBe(true)
+    expect(summary.comparison.income.percent).toBe(0)
+    expect(summary.comparison.income.diff).toBe(1000000)
+
+    expect(summary.comparison.expense.noPrevData).toBe(true)
+    expect(summary.comparison.expense.percent).toBe(0)
+    expect(summary.comparison.expense.diff).toBe(500000)
   })
 })
+

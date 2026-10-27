@@ -37,19 +37,31 @@ import {
   CalendarDays,
   Settings,
   Check,
+  CalendarClock,
+  AlertTriangle,
+  Clock,
+  Link2,
 } from 'lucide-react'
 import { useMovements } from '../../store/useMovements.js'
 import { useAccounts } from '../../store/useAccounts.js'
 import { useBudgets } from '../../store/useBudgets.js'
+import { useGoals } from '../../store/useGoals.js'
+import { useRecurringIncomes } from '../../store/useRecurringIncomes.js'
 import PeriodFilter from '../../components/layout/PeriodFilter.jsx'
 import DonutChart from '../../components/charts/DonutChart.jsx'
 import TrendChart from '../../components/charts/TrendChart.jsx'
+import InterestChart from '../../components/charts/InterestChart.jsx'
+import InvestmentsChart from '../../components/charts/InvestmentsChart.jsx'
 import BudgetBar from '../../components/charts/BudgetBar.jsx'
+import SavingsGoalsSection from '../../components/goals/SavingsGoalsSection.jsx'
 import Button from '../../components/ui/Button.jsx'
-import { getPeriodRange, getPreviousPeriodRange, isDateInRange } from '../../domain/periods.js'
+import FxWidget from '../../components/fx/FxWidget.jsx'
+import ConfirmIncomeOccurrenceModal from '../../components/forms/ConfirmIncomeOccurrenceModal.jsx'
+import { getPeriodRange, getPreviousPeriodRange, isDateInRange, toISODate } from '../../domain/periods.js'
 import { calculatePeriodSummaries } from '../../domain/summaries.js'
 import { calculateBudgetsSummary } from '../../domain/budgets.js'
-import { formatMoney, formatDate } from '../../lib/format.js'
+import { findMatchingManualIncome } from '../../domain/recurringIncome.js'
+import { formatMoney, formatDate, accountLabel } from '../../lib/format.js'
 import { getCardTheme } from '../../lib/constants.js'
 
 const ICON_MAP = {
@@ -70,13 +82,35 @@ export default function OverviewPage() {
   const navigate = useNavigate()
   const { movements, categories, fetchMovements } = useMovements()
   const { accounts, fetchAccounts } = useAccounts()
-  const { budgets, fixedExpenses, pendingRecurring, fetchBudgets, confirmRecurringExpense } = useBudgets()
+  const { budgets, fixedExpenses, pendingRecurring, fetchBudgets, confirmRecurringExpense, markFixedAsPaidManually } = useBudgets()
+  const { fetchGoals } = useGoals()
+  const {
+    recurringIncomes,
+    pendingOccurrences,
+    fetchRecurringIncomes,
+    confirmReceived,
+    markReceivedWithoutMovement,
+    markSkipped,
+    linkManualMovement,
+  } = useRecurringIncomes()
+
+  const [confirmingOccurrence, setConfirmingOccurrence] = useState(null)
+  const todayStr = toISODate(new Date())
 
   // Estado del filtro de periodo
   const [periodType, setPeriodType] = useState('month')
-  const [customRange, setCustomRange] = useState({
-    startDate: new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10),
-    endDate: new Date().toISOString().slice(0, 10),
+  // Usando fechas locales para evitar desfase UTC
+  const [customRange, setCustomRange] = useState(() => {
+    const today = new Date()
+    const prior = new Date(today)
+    prior.setDate(prior.getDate() - 30)
+    const fmt = (d) => {
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    }
+    return { startDate: fmt(prior), endDate: fmt(today) }
   })
 
   // Filtros del historial
@@ -88,7 +122,9 @@ export default function OverviewPage() {
     fetchMovements()
     fetchAccounts()
     fetchBudgets()
-  }, [fetchMovements, fetchAccounts, fetchBudgets])
+    fetchGoals()
+    fetchRecurringIncomes()
+  }, [fetchMovements, fetchAccounts, fetchBudgets, fetchGoals, fetchRecurringIncomes])
 
   // Calcular fechas del periodo actual y anterior
   const { currentRange, prevRange } = useMemo(() => {
@@ -149,6 +185,9 @@ export default function OverviewPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto flex flex-col gap-6">
+      {/* ── Widget de Tipo de Cambio (USD/MXN, EUR/MXN) ── */}
+      <FxWidget />
+
       {/* ── Encabezado y Filtro de Periodo ── */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
@@ -209,8 +248,9 @@ export default function OverviewPage() {
 
             {summary.comparison.income && (
               <span className="text-[11px] text-[var(--text-secondary)] mt-1 block">
-                {summary.comparison.income.percent >= 0 ? '+' : ''}
-                {summary.comparison.income.percent}% vs. periodo ant.
+                {summary.comparison.income.noPrevData
+                  ? 'Sin datos del periodo anterior'
+                  : `${summary.comparison.income.percent >= 0 ? '+' : ''}${summary.comparison.income.percent}% vs. periodo ant.`}
               </span>
             )}
           </div>
@@ -241,8 +281,9 @@ export default function OverviewPage() {
 
             {summary.comparison.expense && (
               <span className="text-[11px] text-[var(--text-secondary)] mt-1 block">
-                {summary.comparison.expense.percent >= 0 ? '+' : ''}
-                {summary.comparison.expense.percent}% vs. periodo ant.
+                {summary.comparison.expense.noPrevData
+                  ? 'Sin datos del periodo anterior'
+                  : `${summary.comparison.expense.percent >= 0 ? '+' : ''}${summary.comparison.expense.percent}% vs. periodo ant.`}
               </span>
             )}
           </div>
@@ -298,9 +339,31 @@ export default function OverviewPage() {
         <TrendChart trendData={summary.trendData} />
       </div>
 
-      {/* ── Presupuestos y Gastos Fijos ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Presupuestos por Categoría */}
+      {/* ── Gráficas: Intereses Ganados e Inversiones (Obedecen al PeriodFilter) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <InterestChart
+          accounts={accounts}
+          movements={movements}
+          period={{
+            type: periodType,
+            startDate: currentRange?.startDate,
+            endDate: currentRange?.endDate,
+          }}
+          referenceDate={new Date()}
+        />
+        <InvestmentsChart
+          period={{
+            type: periodType,
+            startDate: currentRange?.startDate,
+            endDate: currentRange?.endDate,
+          }}
+          referenceDate={new Date()}
+        />
+      </div>
+
+      {/* ── Flujos Recurrentes: Ingresos Esperados y Gastos Fijos ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Ingresos Esperados */}
         <div
           className="rounded-2xl p-5 flex flex-col gap-3"
           style={{
@@ -310,7 +373,7 @@ export default function OverviewPage() {
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <PiggyBank size={18} className="text-[var(--orange-400)]" />
+              <CalendarClock size={18} className="text-[var(--orange-400)]" />
               <h3
                 style={{
                   fontFamily: "'Space Grotesk', sans-serif",
@@ -319,24 +382,24 @@ export default function OverviewPage() {
                   color: 'var(--text-primary)',
                 }}
               >
-                Presupuestos
+                Ingresos esperados
               </h3>
             </div>
             <button
               onClick={() => navigate('/ajustes')}
               className="text-xs text-[var(--orange-400)] hover:text-[var(--orange-300)] flex items-center gap-1 font-medium transition-colors"
-              title="Administrar presupuestos en Ajustes"
+              title="Administrar ingresos recurrentes en Ajustes"
             >
               <Settings size={13} />
               Configurar
             </button>
           </div>
 
-          {budgetsSummary.items.length === 0 ? (
+          {recurringIncomes.length === 0 ? (
             <div className="py-6 flex flex-col items-center justify-center text-center gap-2">
-              <PiggyBank size={28} className="text-[var(--text-muted)] opacity-50" />
+              <CalendarClock size={28} className="text-[var(--text-muted)] opacity-50" />
               <p className="text-xs text-[var(--text-muted)] max-w-xs">
-                No tienes límites configurados. Define presupuestos mensuales por categoría para monitorear alertas de gasto.
+                No tienes ingresos recurrentes registrados. Agrega tu sueldo, quincena o rentas para registrar cobros pendientes.
               </p>
               <Button
                 variant="ghost"
@@ -344,59 +407,164 @@ export default function OverviewPage() {
                 onClick={() => navigate('/ajustes')}
                 className="mt-1 text-xs"
               >
-                Definir presupuestos
+                Agregar ingreso recurrente
               </Button>
             </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {/* Resumen global */}
+          ) : pendingOccurrences.length === 0 ? (
+            <div className="py-8 flex flex-col items-center justify-center text-center gap-2">
               <div
-                className="p-3 rounded-xl flex items-center justify-between text-xs"
-                style={{
-                  background: 'var(--bg-elevated)',
-                  border: '1px solid var(--border-subtle)',
-                }}
+                className="w-10 h-10 rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(34, 197, 94, 0.1)' }}
               >
-                <div className="flex flex-col">
-                  <span className="text-[11px] text-[var(--text-muted)]">Gasto total vs. límite</span>
-                  <span className="font-mono font-bold text-white tabular-nums">
-                    {formatMoney(budgetsSummary.totalSpent)} / {formatMoney(budgetsSummary.totalLimit)}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <span
-                    className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                <CheckCircle2 size={22} className="text-emerald-400" />
+              </div>
+              <p className="text-xs font-semibold text-emerald-400">
+                ¡Al día con tus ingresos esperados!
+              </p>
+              <p className="text-[11px] text-[var(--text-muted)] max-w-xs">
+                No hay cobros pendientes por registrar en este momento.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              <p className="text-[11px] text-[var(--text-muted)]">
+                {pendingOccurrences.length} {pendingOccurrences.length === 1 ? 'ingreso pendiente' : 'ingresos pendientes'} por cobrar:
+              </p>
+              {pendingOccurrences.map(occ => {
+                const rec = recurringIncomes.find(r => r.id === occ.recurringId)
+                if (!rec) return null
+                const isOverdue = occ.dueDate < todayStr
+                const isDueToday = occ.dueDate === todayStr
+                const cat = categoriesMap.get(rec.categoryId)
+                const acc = accountsMap.get(rec.accountId)
+
+                // Buscar sugerencia de vinculación con ingreso manual (±3 días)
+                const matchedMov = findMatchingManualIncome({
+                  occurrence: occ,
+                  recurringIncome: rec,
+                  manualMovements: movements,
+                })
+
+                return (
+                  <div
+                    key={occ.id || `${occ.recurringId}-${occ.dueDate}`}
+                    className="p-3 rounded-xl flex flex-col gap-2.5 transition-colors"
                     style={{
-                      background:
-                        budgetsSummary.overallPercent > 100
-                          ? 'var(--red-900)'
-                          : budgetsSummary.overallPercent >= 80
-                          ? 'rgba(245, 158, 11, 0.15)'
-                          : 'var(--orange-900)',
-                      color:
-                        budgetsSummary.overallPercent > 100
-                          ? 'var(--red-400)'
-                          : budgetsSummary.overallPercent >= 80
-                          ? 'var(--color-warning)'
-                          : 'var(--orange-400)',
+                      background: 'var(--bg-elevated)',
+                      border: isOverdue ? '1px solid var(--red-700)' : '1px solid var(--border-subtle)',
                     }}
                   >
-                    {Math.round(budgetsSummary.overallPercent)}% del total
-                  </span>
-                </div>
-              </div>
+                    {/* Primera fila: nombre, badges, monto */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-xs text-white truncate">
+                            {rec.name}
+                          </span>
+                          {isOverdue && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[var(--red-900)] text-[var(--red-400)] flex items-center gap-1">
+                              <AlertTriangle size={11} />
+                              <span>Atrasado</span>
+                            </span>
+                          )}
+                          {isDueToday && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[var(--orange-900)] text-[var(--orange-400)] flex items-center gap-1">
+                              <Clock size={11} />
+                              <span>Cae hoy</span>
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)] mt-0.5 flex-wrap">
+                          <span>Esperado: {occ.dueDate}</span>
+                          {cat && <span>• {cat.name}</span>}
+                          {acc && <span>• {accountLabel(acc)}</span>}
+                        </div>
+                      </div>
+                      <span className="font-mono text-xs font-bold text-emerald-400 tabular-nums flex-shrink-0">
+                        +{formatMoney(rec.amountCents)}
+                      </span>
+                    </div>
 
-              {/* Lista de barras de presupuesto */}
-              <div className="flex flex-col gap-2.5 max-h-72 overflow-y-auto pr-1">
-                {budgetsSummary.items.map(item => (
-                  <BudgetBar
-                    key={item.categoryId}
-                    categoryName={item.categoryName}
-                    spentCents={item.spentCents}
-                    limitCents={item.limitCents}
-                  />
-                ))}
-              </div>
+                    {/* Sugerencia de vinculación ±3 días */}
+                    {matchedMov && (
+                      <div
+                        className="p-2.5 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px]"
+                        style={{
+                          background: 'rgba(245, 158, 11, 0.1)',
+                          border: '1px solid rgba(245, 158, 11, 0.3)',
+                        }}
+                      >
+                        <div className="flex items-center gap-1.5 text-[var(--color-warning)]">
+                          <Link2 size={13} className="flex-shrink-0" />
+                          <span>
+                            Ingreso similar de {formatMoney(matchedMov.amount)} registrado el {formatDate(matchedMov.date)}.
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await linkManualMovement(occ, matchedMov.id)
+                            } catch (err) {
+                              console.error('Error al vincular ingreso:', err)
+                            }
+                          }}
+                          className="px-2 py-1 rounded text-xs font-semibold bg-[var(--orange-500)] text-black hover:bg-[var(--orange-400)] transition-colors self-end sm:self-auto"
+                          style={{ minHeight: '36px' }}
+                        >
+                          Vincular
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Acciones */}
+                    <div className="flex items-center gap-1.5 justify-end flex-wrap">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await markSkipped(occ)
+                          } catch (err) {
+                            console.error('Error al omitir ingreso:', err)
+                          }
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[var(--text-muted)] hover:text-white transition-colors"
+                        style={{ minHeight: '44px' }}
+                        title="Omitir este ingreso"
+                      >
+                        Omitir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await markReceivedWithoutMovement(occ)
+                          } catch (err) {
+                            console.error('Error al marcar como registrado:', err)
+                          }
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white hover:border-[var(--text-secondary)] transition-colors"
+                        style={{ minHeight: '44px' }}
+                        title="Ya lo registré por otro medio (no duplica saldo)"
+                      >
+                        Ya lo registré
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmingOccurrence({ occurrence: occ, recurringIncome: rec })
+                        }}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--orange-500)] hover:bg-[var(--orange-400)] text-black transition-colors"
+                        style={{ minHeight: '44px' }}
+                        title="Confirmar ingreso y registrar movimiento"
+                      >
+                        <Check size={14} />
+                        <span>Ya me cayó</span>
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
@@ -464,7 +632,7 @@ export default function OverviewPage() {
               </p>
             </div>
           ) : (
-            <div className="flex flex-col gap-2.5 max-h-72 overflow-y-auto pr-1">
+          <div className="flex flex-col gap-2.5">
               <p className="text-[11px] text-[var(--text-muted)]">
                 {pendingRecurring.length} {pendingRecurring.length === 1 ? 'pago pendiente' : 'pagos pendientes'} este mes:
               </p>
@@ -477,39 +645,57 @@ export default function OverviewPage() {
                 return (
                   <div
                     key={item.fixedExpense.id}
-                    className="p-3 rounded-xl flex items-center justify-between gap-2 transition-colors"
+                    className="p-3 rounded-xl flex flex-col gap-2 transition-colors"
                     style={{
                       background: 'var(--bg-elevated)',
                       border: isOverdue ? '1px solid var(--red-700)' : '1px solid var(--border-subtle)',
                     }}
                   >
-                    <div className="flex flex-col min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-xs text-white truncate">
-                          {item.fixedExpense.name}
-                        </span>
-                        {isOverdue && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-[var(--red-900)] text-[var(--red-400)]">
-                            Vencido
+                    {/* Primera fila: nombre, badges, monto */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-xs text-white truncate">
+                            {item.fixedExpense.name}
                           </span>
-                        )}
-                        {isDueToday && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-[var(--orange-900)] text-[var(--orange-400)]">
-                            Vence hoy
-                          </span>
-                        )}
+                          {isOverdue && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[var(--red-900)] text-[var(--red-400)]">
+                              Vencido
+                            </span>
+                          )}
+                          {isDueToday && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[var(--orange-900)] text-[var(--orange-400)]">
+                              Vence hoy
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)] mt-0.5">
+                          <span>Vence {item.dueDate.slice(8, 10)} de este mes</span>
+                          {cat && <span>• {cat.name}</span>}
+                          {acc && <span>• {accountLabel(acc)}</span>}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)] mt-0.5">
-                        <span>Vence {item.dueDate.slice(8, 10)} de este mes</span>
-                        {cat && <span>• {cat.name}</span>}
-                        {acc && <span>• {acc.name}</span>}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="font-mono text-xs font-bold text-white tabular-nums">
+                      <span className="font-mono text-xs font-bold text-white tabular-nums flex-shrink-0">
                         {formatMoney(item.fixedExpense.amount)}
                       </span>
+                    </div>
+
+                    {/* Segunda fila: botones */}
+                    <div className="flex items-center gap-2 justify-end">
+                      <button
+                        onClick={async () => {
+                          try {
+                            await markFixedAsPaidManually(item)
+                          } catch (err) {
+                            console.error('Error al marcar como pagado:', err)
+                          }
+                        }}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white hover:border-[var(--text-secondary)] transition-colors"
+                        title="Marcar como pagado (ya lo pagué por otro medio)"
+                        style={{ minHeight: '44px' }}
+                      >
+                        Ya lo pagué
+                      </button>
                       <button
                         onClick={async () => {
                           try {
@@ -521,6 +707,7 @@ export default function OverviewPage() {
                         }}
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[var(--orange-500)] hover:bg-[var(--orange-400)] text-black transition-colors"
                         title="Confirmar y registrar movimiento"
+                        style={{ minHeight: '44px' }}
                       >
                         <Check size={13} />
                         <span>Pagar</span>
@@ -533,6 +720,110 @@ export default function OverviewPage() {
           )}
         </div>
       </div>
+
+      {/* ── Presupuestos por Categoría ── */}
+      <div
+        className="rounded-2xl p-5 flex flex-col gap-3"
+        style={{
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border-subtle)',
+        }}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <PiggyBank size={18} className="text-[var(--orange-400)]" />
+            <h3
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: 'var(--font-size-base)',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+              }}
+            >
+              Presupuestos
+            </h3>
+          </div>
+          <button
+            onClick={() => navigate('/ajustes')}
+            className="text-xs text-[var(--orange-400)] hover:text-[var(--orange-300)] flex items-center gap-1 font-medium transition-colors"
+            title="Administrar presupuestos en Ajustes"
+          >
+            <Settings size={13} />
+            Configurar
+          </button>
+        </div>
+
+        {budgetsSummary.items.length === 0 ? (
+          <div className="py-6 flex flex-col items-center justify-center text-center gap-2">
+            <PiggyBank size={28} className="text-[var(--text-muted)] opacity-50" />
+            <p className="text-xs text-[var(--text-muted)] max-w-xs">
+              No tienes límites configurados. Define presupuestos mensuales por categoría para monitorear alertas de gasto.
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/ajustes')}
+              className="mt-1 text-xs"
+            >
+              Definir presupuestos
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {/* Resumen global */}
+            <div
+              className="p-3 rounded-xl flex items-center justify-between text-xs"
+              style={{
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-subtle)',
+              }}
+            >
+              <div className="flex flex-col">
+                <span className="text-[11px] text-[var(--text-muted)]">Gasto total vs. límite</span>
+                <span className="font-mono font-bold text-white tabular-nums">
+                  {formatMoney(budgetsSummary.totalSpent)} / {formatMoney(budgetsSummary.totalLimit)}
+                </span>
+              </div>
+              <div className="text-right">
+                <span
+                  className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                  style={{
+                    background:
+                      budgetsSummary.overallPercent > 100
+                        ? 'var(--red-900)'
+                        : budgetsSummary.overallPercent >= 80
+                        ? 'rgba(245, 158, 11, 0.15)'
+                        : 'var(--orange-900)',
+                    color:
+                      budgetsSummary.overallPercent > 100
+                        ? 'var(--red-400)'
+                        : budgetsSummary.overallPercent >= 80
+                        ? 'var(--color-warning)'
+                        : 'var(--orange-400)',
+                  }}
+                >
+                  {Math.round(budgetsSummary.overallPercent)}% del total
+                </span>
+              </div>
+            </div>
+
+            {/* Lista de barras de presupuesto */}
+            <div className="flex flex-col gap-2.5 max-h-72 overflow-y-auto pr-1">
+              {budgetsSummary.items.map(item => (
+                <BudgetBar
+                  key={item.categoryId}
+                  categoryName={item.categoryName}
+                  spentCents={item.spentCents}
+                  limitCents={item.limitCents}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Metas de Ahorro con Barra de Progreso ── */}
+      <SavingsGoalsSection />
 
       {/* ── Historial de Movimientos con Búsqueda y Filtros ── */}
       <section className="flex flex-col gap-3">
@@ -672,8 +963,8 @@ export default function OverviewPage() {
                         )}
                         <span className="truncate">
                           {isTransfer
-                            ? `${account?.name} → ${destAccount?.name}`
-                            : account?.name}
+                            ? `${accountLabel(account)} → ${accountLabel(destAccount)}`
+                            : accountLabel(account)}
                         </span>
                       </div>
                     </div>
@@ -700,6 +991,21 @@ export default function OverviewPage() {
           </div>
         )}
       </section>
+
+      {/* ── Modal para confirmar "Ya me cayó" ── */}
+      <ConfirmIncomeOccurrenceModal
+        isOpen={Boolean(confirmingOccurrence)}
+        onClose={() => setConfirmingOccurrence(null)}
+        occurrence={confirmingOccurrence?.occurrence}
+        recurringIncome={confirmingOccurrence?.recurringIncome}
+        accounts={accounts}
+        onConfirm={async (options) => {
+          if (!confirmingOccurrence?.occurrence) return
+          await confirmReceived(confirmingOccurrence.occurrence, options)
+          await fetchMovements()
+        }}
+      />
     </div>
   )
 }
+

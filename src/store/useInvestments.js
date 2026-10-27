@@ -1,91 +1,29 @@
 /**
  * src/store/useInvestments.js
  *
- * Store Zustand para gestión de inversiones:
+ * Store Zustand para gestión de inversiones con soporte de LOTES y priceHistory:
  *   - Posiciones (holdings): CRUD en Dexie (db.holdings).
- *   - Precios y caché: CoinGecko (criptos) y Finnhub (acciones).
- *   - Tipo de cambio USD/MXN con fallback.
- *   - Cálculo reactivo de valor actual, ganancias y variación 24h.
+ *   - Lotes de compra (lots): CRUD en Dexie (db.lots) con fecha, cantidad y precio unitario.
+ *   - Cálculo reactivo de costo promedio ponderado y cantidad consolidada a partir de lotes.
+ *   - Precios en vivo y caché histórico: CoinGecko (criptos) y Finnhub (acciones).
+ *   - Historial de precios (db.priceHistory) para gráficas de rendimiento.
+ *   - Integración con useFx para tipo de cambio USD/MXN.
  */
 
 import { create } from 'zustand'
 import { db } from '../db/database.js'
-import { getAllPrices } from '../services/prices.js'
+import { getAllPrices, getPriceHistoryMap } from '../services/prices.js'
 import { getUsdMxnRate } from '../services/fx.js'
-
-const INITIAL_HOLDINGS_SEED = [
-  {
-    id: 'hold-btc',
-    kind: 'crypto',
-    symbol: 'BTC',
-    name: 'Bitcoin',
-    quantity: 0.05,
-    avgCost: 6500000, // $65,000.00 USD en centavos
-    costCurrency: 'USD',
-    priceSourceId: 'coingecko',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'hold-eth',
-    kind: 'crypto',
-    symbol: 'ETH',
-    name: 'Ethereum',
-    quantity: 0.5,
-    avgCost: 280000, // $2,800.00 USD en centavos
-    costCurrency: 'USD',
-    priceSourceId: 'coingecko',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'hold-nvda',
-    kind: 'stock',
-    symbol: 'NVDA',
-    name: 'NVIDIA',
-    quantity: 5,
-    avgCost: 11500, // $115.00 USD en centavos
-    costCurrency: 'USD',
-    priceSourceId: 'finnhub',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'hold-amd',
-    kind: 'stock',
-    symbol: 'AMD',
-    name: 'AMD',
-    quantity: 10,
-    avgCost: 14000, // $140.00 USD en centavos
-    costCurrency: 'USD',
-    priceSourceId: 'finnhub',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'hold-intc',
-    kind: 'stock',
-    symbol: 'INTC',
-    name: 'Intel',
-    quantity: 20,
-    avgCost: 2200, // $22.00 USD en centavos
-    costCurrency: 'USD',
-    priceSourceId: 'finnhub',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'hold-nflx',
-    kind: 'stock',
-    symbol: 'NFLX',
-    name: 'Netflix',
-    quantity: 3,
-    avgCost: 62000, // $620.00 USD en centavos
-    costCurrency: 'USD',
-    priceSourceId: 'finnhub',
-    createdAt: new Date().toISOString(),
-  },
-]
+import { useFx } from './useFx.js'
+import { aggregateLots } from '../domain/investments.js'
+import { todayLocalISO } from '../lib/format.js'
 
 export const useInvestments = create((set, get) => ({
   holdings: [],
+  lots: [],
   priceMap: new Map(),
-  fxRate: 18.0,
+  priceHistoryMap: new Map(),
+  fxRate: 18.5,
   fxSource: 'default',
   isAnyStale: false,
   hasFinnhubKey: false,
@@ -94,25 +32,62 @@ export const useInvestments = create((set, get) => ({
   error: null,
 
   /**
-   * Carga posiciones desde IndexedDB. Si la tabla está vacía,
-   * inicializa con las posiciones predeterminadas del plan.
+   * Carga posiciones y lotes reales desde IndexedDB.
+   * Purga automáticamente cualquier posición falsa sembrada en pruebas previas.
    */
   fetchHoldings: async () => {
     set({ loading: true, error: null })
     try {
       let allHoldings = await db.holdings.toArray()
+      let allLots = db.lots ? await db.lots.toArray() : []
 
-      // Si está vacía, sembrar posiciones iniciales
-      if (allHoldings.length === 0) {
-        await db.holdings.bulkAdd(INITIAL_HOLDINGS_SEED)
+      // Purgar holdings falsos del seed inicial antiguo si aún existen
+      const mockIds = ['hold-btc', 'hold-eth', 'hold-nvda', 'hold-amd', 'hold-intc', 'hold-nflx']
+      const mockHoldings = allHoldings.filter(h => mockIds.includes(h.id))
+      if (mockHoldings.length > 0) {
+        for (const h of mockHoldings) {
+          await db.holdings.delete(h.id)
+          if (db.lots) {
+            const mockLots = await db.lots.where('holdingId').equals(h.id).primaryKeys()
+            await db.lots.bulkDelete(mockLots)
+          }
+        }
         allHoldings = await db.holdings.toArray()
+        allLots = db.lots ? await db.lots.toArray() : []
       }
 
-      set({ holdings: allHoldings, loading: false })
+      // Asociar lotes a cada holding y actualizar sus promedios
+      const enrichedHoldings = allHoldings.map(h => {
+        const holdingLots = allLots.filter(l => l.holdingId === h.id || l.symbol === h.symbol)
+        if (holdingLots.length > 0) {
+          const agg = aggregateLots(holdingLots)
+          return {
+            ...h,
+            quantity: agg.totalQuantity,
+            avgCost: agg.avgCostCents,
+            lots: holdingLots,
+          }
+        }
+        return {
+          ...h,
+          lots: [],
+        }
+      })
+
+      // Cargar mapa de histórico de precios
+      const historyMap = await getPriceHistoryMap()
+
+      set({
+        holdings: enrichedHoldings,
+        lots: allLots,
+        priceHistoryMap: historyMap,
+        loading: false,
+      })
+
       // Actualizar precios automáticamente al cargar
       await get().refreshPrices()
     } catch (err) {
-      console.error('[useInvestments] Error al cargar holdings:', err)
+      console.error('[useInvestments] Error al cargar holdings y lotes:', err)
       set({ error: 'No se pudieron cargar las inversiones.', loading: false })
     }
   },
@@ -127,16 +102,20 @@ export const useInvestments = create((set, get) => ({
       const symbols = Array.from(new Set(holdings.map(h => h.symbol.toUpperCase())))
 
       // Consultar precios y tipo de cambio en paralelo
-      const [pricesResult, fxResult] = await Promise.all([
+      const [pricesResult, fxResult, historyMap] = await Promise.all([
         getAllPrices(symbols.length > 0 ? symbols : ['BTC', 'ETH', 'NFLX', 'INTC', 'AMD', 'NVDA']),
         getUsdMxnRate(),
+        getPriceHistoryMap(symbols),
       ])
+
+      const liveFx = useFx.getState().getRate('USD') || fxResult.rate
 
       set({
         priceMap: pricesResult.priceMap,
+        priceHistoryMap: historyMap,
         isAnyStale: pricesResult.isAnyStale,
         hasFinnhubKey: pricesResult.hasFinnhubKey,
-        fxRate: fxResult.rate,
+        fxRate: liveFx,
         fxSource: fxResult.source,
         refreshing: false,
       })
@@ -147,13 +126,66 @@ export const useInvestments = create((set, get) => ({
   },
 
   /**
-   * Agrega una nueva posición de inversión.
+   * Agrega un nuevo lote de compra a una posición y recalcula su costo promedio.
+   * @param {Object} lotData
+   * @param {string} lotData.holdingId
+   * @param {string} lotData.symbol
+   * @param {number} lotData.quantity
+   * @param {number} lotData.priceCents
+   * @param {string} [lotData.date]
+   * @param {string} [lotData.costCurrency='USD']
+   */
+  addLot: async (lotData) => {
+    try {
+      const newLot = {
+        id: crypto.randomUUID(),
+        holdingId: lotData.holdingId,
+        symbol: lotData.symbol.toUpperCase().trim(),
+        quantity: Math.max(0, Number(lotData.quantity) || 0),
+        priceCents: Math.max(0, Math.round(Number(lotData.priceCents) || 0)),
+        date: lotData.date || todayLocalISO(),
+        costCurrency: lotData.costCurrency || 'USD',
+        createdAt: new Date().toISOString(),
+      }
+
+      if (db.lots) {
+        await db.lots.add(newLot)
+      }
+
+      // Recargar lotes y actualizar la posición padre
+      await get().fetchHoldings()
+      return newLot
+    } catch (err) {
+      console.error('[useInvestments] Error al agregar lote:', err)
+      throw err
+    }
+  },
+
+  /**
+   * Elimina un lote por ID y recalcula la posición padre.
+   * @param {string} lotId
+   */
+  deleteLot: async (lotId) => {
+    try {
+      if (db.lots) {
+        await db.lots.delete(lotId)
+      }
+      await get().fetchHoldings()
+    } catch (err) {
+      console.error('[useInvestments] Error al eliminar lote:', err)
+      throw err
+    }
+  },
+
+  /**
+   * Agrega una nueva posición de inversión. Si incluye lote inicial, lo registra.
    * @param {Object} holdingData
    */
   addHolding: async (holdingData) => {
     try {
+      const holdingId = crypto.randomUUID()
       const newHolding = {
-        id: crypto.randomUUID(),
+        id: holdingId,
         kind: holdingData.kind || 'stock',
         symbol: holdingData.symbol.toUpperCase().trim(),
         name: holdingData.name?.trim() || holdingData.symbol.toUpperCase().trim(),
@@ -165,9 +197,22 @@ export const useInvestments = create((set, get) => ({
       }
 
       await db.holdings.add(newHolding)
-      const updated = await db.holdings.toArray()
-      set({ holdings: updated })
-      await get().refreshPrices()
+
+      // Registrar el lote inicial de adquisición
+      if (db.lots && newHolding.quantity > 0) {
+        await db.lots.add({
+          id: crypto.randomUUID(),
+          holdingId,
+          symbol: newHolding.symbol,
+          date: holdingData.purchaseDate || todayLocalISO(),
+          quantity: newHolding.quantity,
+          priceCents: newHolding.avgCost,
+          costCurrency: newHolding.costCurrency,
+          createdAt: new Date().toISOString(),
+        })
+      }
+
+      await get().fetchHoldings()
       return newHolding
     } catch (err) {
       console.error('[useInvestments] Error al agregar inversión:', err)
@@ -188,9 +233,7 @@ export const useInvestments = create((set, get) => ({
       if ('symbol' in sanitized) sanitized.symbol = sanitized.symbol.toUpperCase().trim()
 
       await db.holdings.update(id, sanitized)
-      const updated = await db.holdings.toArray()
-      set({ holdings: updated })
-      await get().refreshPrices()
+      await get().fetchHoldings()
     } catch (err) {
       console.error('[useInvestments] Error al actualizar inversión:', err)
       throw err
@@ -198,15 +241,20 @@ export const useInvestments = create((set, get) => ({
   },
 
   /**
-   * Elimina una posición por ID.
+   * Elimina una posición por ID y todos sus lotes asociados.
    * @param {string} id
    */
   deleteHolding: async (id) => {
     try {
+      const holding = get().holdings.find(h => h.id === id)
       await db.holdings.delete(id)
-      set(state => ({
-        holdings: state.holdings.filter(h => h.id !== id),
-      }))
+      if (db.lots && holding) {
+        const lotsToDelete = await db.lots.where('holdingId').equals(id).toArray()
+        for (const lot of lotsToDelete) {
+          await db.lots.delete(lot.id)
+        }
+      }
+      await get().fetchHoldings()
     } catch (err) {
       console.error('[useInvestments] Error al eliminar inversión:', err)
       throw err

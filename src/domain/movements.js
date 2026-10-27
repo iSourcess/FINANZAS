@@ -32,8 +32,17 @@ export function calculateBalanceChange({
   accountType,
   movementType,
   amount,
+  deltaCents,
   isSourceAccount = true,
 }) {
+  // Ajuste de saldo (cuadre): aplica directamente deltaCents con signo
+  if (movementType === 'adjustment') {
+    if (deltaCents !== undefined && deltaCents !== null) {
+      return Math.round(Number(deltaCents) || 0)
+    }
+    return Math.round(Number(amount) || 0)
+  }
+
   const safeAmount = Math.abs(Math.round(amount || 0))
 
   if (accountType === 'credit') {
@@ -73,7 +82,7 @@ export function calculateBalanceChange({
 /**
  * Aplica un movimiento a una cuenta y retorna la cuenta con el nuevo balance.
  * @param {Object} account - Objeto de cuenta { id, balance, type, ... }
- * @param {Object} movement - Objeto de movimiento { type, amount, ... }
+ * @param {Object} movement - Objeto de movimiento { type, amount, deltaCents, ... }
  * @param {boolean} [isSourceAccount=true]
  * @returns {Object} Copia de la cuenta con balance actualizado
  */
@@ -82,6 +91,7 @@ export function applyMovementToAccount(account, movement, isSourceAccount = true
     accountType: account.type,
     movementType: movement.type,
     amount: movement.amount,
+    deltaCents: movement.deltaCents,
     isSourceAccount,
   })
 
@@ -103,6 +113,7 @@ export function revertMovementFromAccount(account, movement, isSourceAccount = t
     accountType: account.type,
     movementType: movement.type,
     amount: movement.amount,
+    deltaCents: movement.deltaCents,
     isSourceAccount,
   })
 

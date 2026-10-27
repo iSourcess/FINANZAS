@@ -176,6 +176,7 @@ export const useBudgets = create((set, get) => ({
 
   /**
    * Confirma y registra el pago de un gasto fijo pendiente en un solo toque.
+   * Crea el movimiento con fixedId para que el gasto no aparezca como pendiente.
    * @param {Object} pendingItem - Elemento de pendingRecurring
    * @param {string} [customAccountId] - Cuenta opcional con la que se paga
    */
@@ -194,6 +195,37 @@ export const useBudgets = create((set, get) => ({
       await get().fetchBudgets()
     } catch (err) {
       console.error('[useBudgets] Error al confirmar gasto fijo:', err)
+      throw err
+    }
+  },
+
+  /**
+   * Marca un gasto fijo como pagado manualmente sin crear movimiento ni alterar saldos.
+   * Útil para gastos que ya se pagaron por otro medio y solo se quiere registrar como pagado.
+   * Internamente inserta un movimiento de marca con amount=0 y markedPaidManually=true.
+   * @param {Object} pendingItem - Elemento de pendingRecurring
+   */
+  markFixedAsPaidManually: async (pendingItem) => {
+    try {
+      const { db } = await import('../db/database.js')
+      const marker = {
+        id: crypto.randomUUID(),
+        type: 'expense',
+        amount: 0,
+        currency: pendingItem.fixedExpense.currency || 'MXN',
+        accountId: pendingItem.fixedExpense.accountId || null,
+        categoryId: pendingItem.fixedExpense.categoryId || null,
+        date: pendingItem.dueDate,
+        note: `[Pagado manualmente] ${pendingItem.fixedExpense.name || 'Gasto fijo'}`,
+        fixedId: pendingItem.fixedExpense.id,
+        markedPaidManually: true,
+        fxRate: null,
+        createdAt: new Date().toISOString(),
+      }
+      await db.movements.add(marker)
+      await get().fetchBudgets()
+    } catch (err) {
+      console.error('[useBudgets] Error al marcar gasto fijo como pagado:', err)
       throw err
     }
   },

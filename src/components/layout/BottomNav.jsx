@@ -60,6 +60,8 @@ export default function BottomNav() {
             transition: 'color var(--transition-micro)',
             WebkitTapHighlightColor: 'transparent',
             cursor: 'pointer',
+            outline: 'none',
+            borderRadius: 'var(--radius-md)',
           })}
         >
           {({ isActive }) => (
@@ -117,6 +119,8 @@ export default function BottomNav() {
           transition: 'color var(--transition-micro)',
           WebkitTapHighlightColor: 'transparent',
           flexShrink: 0,
+          outline: 'none',
+          borderRadius: 'var(--radius-md)',
         }}
         onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
         onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}

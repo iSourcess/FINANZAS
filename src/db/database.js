@@ -213,4 +213,202 @@ db.version(2)
     }
   })
 
+db.version(3).stores({
+  /**
+   * Versión 3:
+   * Agrega fxHistory para persistir el historial diario de tipos de cambio (USD/MXN, EUR/MXN)
+   * con índice compuesto [pair+date] para garantizar una sola tasa por día y búsquedas rápidas.
+   */
+  accounts: '++id, type, currency, parentId, sortOrder',
+  movements: '++id, accountId, toAccountId, categoryId, date, type',
+  categories: '++id, type',
+  budgets: '++id, categoryId',
+  fixedExpenses: '++id, categoryId, accountId',
+  holdings: '++id, symbol, kind',
+  priceCache: 'symbol',
+  settings: 'id',
+  fxHistory: '++id, [pair+date], pair, date',
+})
+
+db.version(4)
+  .stores({
+    /**
+     * Versión 4:
+     * - lots: lotes de adquisición individuales por activo (fecha, cantidad, precio unitario).
+     * - priceHistory: historial diario de precios por símbolo con clave compuesta [symbol+date].
+     */
+    accounts: '++id, type, currency, parentId, sortOrder',
+    movements: '++id, accountId, toAccountId, categoryId, date, type',
+    categories: '++id, type',
+    budgets: '++id, categoryId',
+    fixedExpenses: '++id, categoryId, accountId',
+    holdings: '++id, symbol, kind',
+    lots: '++id, holdingId, symbol, date',
+    priceCache: 'symbol',
+    priceHistory: '++id, [symbol+date], symbol, date',
+    settings: 'id',
+    fxHistory: '++id, [pair+date], pair, date',
+  })
+  .upgrade(async (tx) => {
+    // Migración v3 -> v4: para cada holding existente con cantidad > 0, crear un lote inicial
+    const holdings = await tx.table('holdings').toArray()
+    for (const h of holdings) {
+      if (h.quantity > 0) {
+        await tx.table('lots').add({
+          id: crypto.randomUUID(),
+          holdingId: h.id,
+          symbol: h.symbol,
+          date: (h.createdAt || '').slice(0, 10) || '2026-10-01',
+          quantity: Number(h.quantity),
+          priceCents: Math.round(Number(h.avgCost) || 0),
+          costCurrency: h.costCurrency || 'USD',
+          createdAt: h.createdAt || new Date().toISOString(),
+        })
+      }
+    }
+  })
+
+db.version(5).stores({
+  /**
+   * Versión 5:
+   * - goals: Metas de ahorro personales con nombre, monto objetivo y fecha opcional.
+   * - goalContributions: Aportes registrados vinculados a una cuenta bancaria / efectivo.
+   */
+  accounts: '++id, type, currency, parentId, sortOrder',
+  movements: '++id, accountId, toAccountId, categoryId, date, type',
+  categories: '++id, type',
+  budgets: '++id, categoryId',
+  fixedExpenses: '++id, categoryId, accountId',
+  holdings: '++id, symbol, kind',
+  lots: '++id, holdingId, symbol, date',
+  priceCache: 'symbol',
+  priceHistory: '++id, [symbol+date], symbol, date',
+  settings: 'id',
+  fxHistory: '++id, [pair+date], pair, date',
+  goals: '++id, name, targetDate, status, createdAt',
+  goalContributions: '++id, goalId, accountId, date, createdAt',
+})
+
+db.version(6)
+  .stores({
+    /**
+     * Versión 6:
+     * - accounts: agrega lastReconciledAt (último cuadre de saldo) indexado.
+     * - movements: agrega reason (motivo del movimiento / ajuste) indexado.
+     */
+    accounts: '++id, type, currency, parentId, sortOrder, lastReconciledAt',
+    movements: '++id, accountId, toAccountId, categoryId, date, type, reason',
+    categories: '++id, type',
+    budgets: '++id, categoryId',
+    fixedExpenses: '++id, categoryId, accountId',
+    holdings: '++id, symbol, kind',
+    lots: '++id, holdingId, symbol, date',
+    priceCache: 'symbol',
+    priceHistory: '++id, [symbol+date], symbol, date',
+    settings: 'id',
+    fxHistory: '++id, [pair+date], pair, date',
+    goals: '++id, name, targetDate, status, createdAt',
+    goalContributions: '++id, goalId, accountId, date, createdAt',
+  })
+  .upgrade(async (tx) => {
+    // Migración v5 -> v6: inicializar lastReconciledAt en null para cuentas existentes
+    const accounts = await tx.table('accounts').toArray()
+    for (const acc of accounts) {
+      if (acc.lastReconciledAt === undefined) {
+        await tx.table('accounts').update(acc.id, { lastReconciledAt: null })
+      }
+    }
+  })
+
+db.version(7)
+  .stores({
+    /**
+     * Versión 7:
+     * - templates: plantillas de movimientos frecuentes
+     */
+    accounts: '++id, type, currency, parentId, sortOrder, lastReconciledAt',
+    movements: '++id, accountId, toAccountId, categoryId, date, type, reason',
+    categories: '++id, type',
+    budgets: '++id, categoryId',
+    fixedExpenses: '++id, categoryId, accountId',
+    holdings: '++id, symbol, kind',
+    lots: '++id, holdingId, symbol, date',
+    priceCache: 'symbol',
+    priceHistory: '++id, [symbol+date], symbol, date',
+    settings: 'id',
+    fxHistory: '++id, [pair+date], pair, date',
+    goals: '++id, name, targetDate, status, createdAt',
+    goalContributions: '++id, goalId, accountId, date, createdAt',
+    templates: '++id, sortOrder, useCount, type, categoryId, accountId',
+  })
+  .upgrade(async (tx) => {
+    // Migración v6 -> v7: asegurar que settings tenga templateTapBehavior
+    const settings = await tx.table('settings').get('global')
+    if (settings && settings.templateTapBehavior === undefined) {
+      await tx.table('settings').update('global', { templateTapBehavior: 'fill' })
+    }
+  })
+
+db.version(8).stores({
+  /**
+   * Versión 8:
+   * - recurringIncomes: ingresos recurrentes (sueldo, quincena, renta cobrada, etc.)
+   * - recurringIncomeOccurrences: ocurrencias pendientes, recibidas u omitidas
+   */
+  accounts: '++id, type, currency, parentId, sortOrder, lastReconciledAt',
+  movements: '++id, accountId, toAccountId, categoryId, date, type, reason',
+  categories: '++id, type',
+  budgets: '++id, categoryId',
+  fixedExpenses: '++id, categoryId, accountId',
+  holdings: '++id, symbol, kind',
+  lots: '++id, holdingId, symbol, date',
+  priceCache: 'symbol',
+  priceHistory: '++id, [symbol+date], symbol, date',
+  settings: 'id',
+  fxHistory: '++id, [pair+date], pair, date',
+  goals: '++id, name, targetDate, status, createdAt',
+  goalContributions: '++id, goalId, accountId, date, createdAt',
+  templates: '++id, sortOrder, useCount, type, categoryId, accountId',
+  recurringIncomes: '++id, frequency, categoryId, accountId, active, startDate',
+  recurringIncomeOccurrences: '++id, [recurringId+dueDate], recurringId, dueDate, status',
+})
+
+db.version(9)
+  .stores({
+    /**
+     * Versión 9:
+     * - debts: deudas y préstamos ("me deben" y "debo")
+     * - debtPayments: abonos y pagos de deudas
+     */
+    accounts: '++id, type, currency, parentId, sortOrder, lastReconciledAt',
+    movements: '++id, accountId, toAccountId, categoryId, date, type, reason, debtId',
+    categories: '++id, type',
+    budgets: '++id, categoryId',
+    fixedExpenses: '++id, categoryId, accountId',
+    holdings: '++id, symbol, kind',
+    lots: '++id, holdingId, symbol, date',
+    priceCache: 'symbol',
+    priceHistory: '++id, [symbol+date], symbol, date',
+    settings: 'id',
+    fxHistory: '++id, [pair+date], pair, date',
+    goals: '++id, name, targetDate, status, createdAt',
+    goalContributions: '++id, goalId, accountId, date, createdAt',
+    templates: '++id, sortOrder, useCount, type, categoryId, accountId',
+    recurringIncomes: '++id, frequency, categoryId, accountId, active, startDate',
+    recurringIncomeOccurrences: '++id, [recurringId+dueDate], recurringId, dueDate, status',
+    debts: '++id, direction, person, status, openedAt, dueDate',
+    debtPayments: '++id, debtId, date, accountId, adjustmentId',
+  })
+  .upgrade(async (tx) => {
+    // Migración v8 -> v9: asegurar que settings tenga includeDebtsInNetWorth (por defecto false)
+    const settings = await tx.table('settings').get('global')
+    if (settings && settings.includeDebtsInNetWorth === undefined) {
+      await tx.table('settings').update('global', { includeDebtsInNetWorth: false })
+    }
+  })
+
 export default db
+
+
+
+

@@ -100,12 +100,19 @@ export default function CardStack({
     }),
   )
 
-  /* ── Filtrado de cuentas ──────────────────────────────────── */
-  const filteredAccounts = accounts.filter(acc => {
-    if (filter === 'debit') return acc.type === 'debit' || acc.type === 'cash' || acc.type === 'savings'
-    if (filter === 'credit') return acc.type === 'credit'
-    return true
-  })
+  /* ── Filtrado y orden de cuentas ──────────────────────────── */
+  // Orden de la pila: débito/ahorro primero, crédito después, efectivo al final
+  const TYPE_ORDER = { debit: 0, savings: 0, credit: 1, cash: 2 }
+
+  const filteredAccounts = accounts
+    .filter(acc => {
+      // Las cajas y apartados vinculados a una tarjeta de débito viven dentro de ella, no como tarjeta suelta
+      if (acc.parentId) return false
+      if (filter === 'debit') return acc.type === 'debit' || acc.type === 'cash' || acc.type === 'savings'
+      if (filter === 'credit') return acc.type === 'credit'
+      return true
+    })
+    .sort((a, b) => (TYPE_ORDER[a.type] ?? 3) - (TYPE_ORDER[b.type] ?? 3))
 
   // En modo apilado, si el usuario selecciona una tarjeta la traemos al frente
   const sortedAccounts = [...filteredAccounts]
@@ -169,64 +176,68 @@ export default function CardStack({
     >
       <div className="w-full flex flex-col gap-4">
         {/* ── Controles superiores: Filtros y modo de visualización ── */}
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 p-1 rounded-xl" style={{ background: 'var(--bg-elevated)' }}>
+        <div className="flex items-center justify-between gap-2">
+          {/* Segmented controls de filtro */}
+          <div
+            className="flex items-center gap-1 p-1 rounded-xl"
+            style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
+          >
             <button
+              type="button"
               onClick={() => setFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center ${
                 filter === 'all'
                   ? 'bg-[var(--bg-surface)] text-[var(--orange-400)] shadow-sm'
                   : 'text-[var(--text-secondary)] hover:text-white'
               }`}
-              style={{ minHeight: '44px' }}
+              style={{ minHeight: '36px' }}
             >
               Todas ({accounts.length})
             </button>
             <button
+              type="button"
               onClick={() => setFilter('debit')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center ${
                 filter === 'debit'
                   ? 'bg-[var(--bg-surface)] text-[var(--orange-400)] shadow-sm'
                   : 'text-[var(--text-secondary)] hover:text-white'
               }`}
-              style={{ minHeight: '44px' }}
+              style={{ minHeight: '36px' }}
             >
               Débito
             </button>
             <button
+              type="button"
               onClick={() => setFilter('credit')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center ${
                 filter === 'credit'
                   ? 'bg-[var(--bg-surface)] text-[var(--orange-400)] shadow-sm'
                   : 'text-[var(--text-secondary)] hover:text-white'
               }`}
-              style={{ minHeight: '44px' }}
+              style={{ minHeight: '36px' }}
             >
               Crédito
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Alternar modo pila / cuadrícula */}
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              title={isExpanded ? 'Modo pila Google Wallet' : 'Ver todas desplegadas'}
-              className="p-2 rounded-xl text-[var(--text-secondary)] hover:text-white transition-colors"
-              style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', minHeight: '44px', minWidth: '44px' }}
-            >
-              {isExpanded ? <Layers size={18} /> : <LayoutGrid size={18} />}
-            </button>
-
-            {/* Botón agregar cuenta */}
-            <Button
-              size="sm"
-              variant="secondary"
-              icon={Plus}
-              onClick={onAddNew}
-            >
-              Nueva
-            </Button>
-          </div>
+          {/* Alternar modo pila / lista completa (perfectamente centrado) */}
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            title={isExpanded ? 'Agrupar tarjetas (modo pila)' : 'Desagrupar tarjetas (ver todas)'}
+            aria-label={isExpanded ? 'Agrupar tarjetas' : 'Desagrupar tarjetas'}
+            className="w-11 h-11 rounded-xl flex items-center justify-center text-[var(--text-secondary)] hover:text-white transition-all flex-shrink-0"
+            style={{
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-subtle)',
+            }}
+          >
+            {isExpanded ? (
+              <Layers size={18} className="text-[var(--orange-400)]" />
+            ) : (
+              <LayoutGrid size={18} />
+            )}
+          </button>
         </div>
 
         {/* Indicador de modo reordenamiento activo */}
@@ -259,6 +270,7 @@ export default function CardStack({
                 <WalletCard
                   key={account.id}
                   account={account}
+                  childAccounts={accounts.filter(a => a.parentId === account.id)}
                   isStacked={false}
                   sortable
                   onClick={() => {
@@ -293,6 +305,7 @@ export default function CardStack({
                     >
                       <WalletCard
                         account={account}
+                        childAccounts={accounts.filter(a => a.parentId === account.id)}
                         isStacked={!isTop}
                         isActive={activeCardId === account.id}
                         sortable

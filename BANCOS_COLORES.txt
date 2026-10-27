@@ -1,0 +1,160 @@
+=====================================================================
+BANCOS Y PLATAFORMAS: COLORES PARA EL SELECTOR "BANCO / ESTILO VISUAL"
+=====================================================================
+Fecha de revision: 26 de octubre de 2026
+
+LEYENDA DE VERIFICACION
+  [V]  Encontrado en al menos una fuente consultada en esta revision.
+       OJO: son paginas de terceros (analisis del sitio web de la marca,
+       bases de colores de marca), NO manuales oficiales. Sirven para
+       arrancar, pero confirma con gotero sobre el logo oficial.
+  [M]  Viene de mi memoria. NO lo pude verificar en esta revision.
+  [?]  No encontre ninguna fuente confiable. No pongo color para no
+       inventarlo. Usa "Otro / personalizado" con el gotero.
+
+COLUMNAS
+  Banco | Color principal | Texto sobre la tarjeta | Uso | Estado
+
+---------------------------------------------------------------------
+CORRECCIONES A LO QUE TE DIJE ANTES
+---------------------------------------------------------------------
+1. REVOLUT: yo puse #0666EB. Las fuentes consultadas dan #494FDF (azul
+   violeta de marca) y #191C1F (casi negro). Usa esos dos.
+2. MERCADO PAGO: yo te dije que su color era azul claro y que el
+   amarillo era de Mercado Libre. Estaba desactualizado. Segun notas de
+   prensa, Mercado Pago cambio su app y materiales al amarillo de
+   Mercado Libre (incluye Mexico, con declaraciones de su director en
+   Mexico); el logo sigue siendo azul. Tu amarillo es correcto para la
+   app. Amarillo de referencia de Mercado Libre: #FFE600.
+3. BANORTE: yo puse #EB0029. La fuente consultada da #EC0029.
+
+---------------------------------------------------------------------
+MEXICO: NEOBANCOS Y FINTECH
+---------------------------------------------------------------------
+Banco          Color                      Texto    Uso                       Estado
+Nu             #820AD1                    blanco   Ahorro, debito, credito   [V]
+               (otras fuentes dan #8A05BE para el logo antiguo y
+                #8D0DE3 en un analisis distinto; confirma con gotero)
+Revolut        #494FDF  y  #191C1F        blanco   Ahorro, debito, credito   [V]
+Mercado Pago   #FFE600 (app amarilla)     oscuro   Rendimiento, debito,      [V]
+               logo azul: sin hex          #1A1A1A credito                   [?]
+Klar           sin dato                   -        Debito, credito           [?]
+Stori          sin dato                   -        Credito                   [?]
+Uala           sin dato                   -        Ahorro, debito            [?]
+Hey Banco      sin dato                   -        Debito, credito           [?]
+Openbank       #EC0000 aprox.             blanco   Ahorro, inversion         [M]
+
+---------------------------------------------------------------------
+MEXICO: BANCOS TRADICIONALES
+---------------------------------------------------------------------
+Banco          Color                      Texto    Uso                       Estado
+BBVA           #004481                    blanco   Debito, credito,          [V]
+               (una filial BBVA publica   inversion
+                #004480; es el mismo azul)
+Banorte        #EC0029                    blanco   Debito, credito,          [V]
+                                                   inversion
+Santander      #EC0000                    blanco   Debito, credito,          [M]
+                                                   inversion
+HSBC           #DB0011                    blanco   Debito, credito           [M]
+Scotiabank     #EC111A                    blanco   Debito, credito           [M]
+Banamex        sin dato (en rebranding)   -        Debito, credito           [?]
+Inbursa        sin dato                   -        Debito, inversion         [?]
+BanCoppel      sin dato                   -        Debito, credito           [?]
+Banco Azteca   sin dato                   -        Debito, credito           [?]
+BanRegio       sin dato                   -        Debito, credito           [?]
+
+---------------------------------------------------------------------
+MEXICO: INVERSION
+---------------------------------------------------------------------
+Plataforma     Color                      Texto    Uso                       Estado
+Cetes Directo  sin dato                   -        Cetes y bonos             [?]
+GBM+           sin dato                   -        Acciones, ETFs, fondos    [?]
+Kuspit         sin dato                   -        Acciones, fondos          [?]
+Fintual        sin dato                   -        Fondos de inversion       [?]
+Bitso          sin dato                   -        Criptomonedas             [?]
+
+---------------------------------------------------------------------
+INTERNACIONAL: BANCOS Y AHORRO
+---------------------------------------------------------------------
+Banco          Color                      Texto    Uso                       Estado
+Wise           #9FE870                    oscuro   Multimoneda,              [M]
+                                          #163300  transferencias
+N26            #088177 (sitio actual)     blanco   Cuenta digital            [V]
+               #36A18B (color historico)
+Chime          #1EC677                    oscuro   Cuenta digital (EE. UU.)  [M]
+PayPal         #003087                    blanco   Pagos, cartera digital    [M]
+
+---------------------------------------------------------------------
+INTERNACIONAL: INVERSION
+---------------------------------------------------------------------
+Plataforma           Color               Texto    Uso                        Estado
+Interactive Brokers  #D81222             blanco   Acciones y ETFs globales   [M]
+Charles Schwab       #00A0DF             oscuro   Acciones, ETFs, fondos     [M]
+Fidelity             #368727             blanco   Acciones, fondos           [M]
+Vanguard             #96151D aprox.      blanco   Fondos indexados           [M]
+Robinhood            #00C805             oscuro   Acciones, cripto           [M]
+eToro                #13C636             oscuro   Acciones, cripto           [M]
+Trading 212          #0098DB aprox.      blanco   Acciones, ETFs             [M]
+Coinbase             #0052FF             blanco   Criptomonedas              [M]
+Binance              #F0B90B             oscuro   Criptomonedas              [M]
+Kraken               #5741D9             blanco   Criptomonedas              [M]
+
+---------------------------------------------------------------------
+OTROS
+---------------------------------------------------------------------
+Efectivo       Naranja de la app          oscuro   Efectivo                  -
+Otro           Selector de color libre    auto     Cualquier banco           -
+
+---------------------------------------------------------------------
+RESUMEN DE LA REVISION
+---------------------------------------------------------------------
+  Verificados [V]: Nu, Revolut, Mercado Pago (app), BBVA, Banorte, N26.
+  De memoria [M]: 17, incluye Santander, HSBC, Scotiabank y las
+                  plataformas internacionales.
+  Sin dato [?]: 14. No encontre fuente para Klar, Stori, Uala,
+                Hey Banco, Banamex, Inbursa, BanCoppel, Banco Azteca,
+                BanRegio, Cetes Directo, GBM+, Kuspit, Fintual y Bitso.
+
+---------------------------------------------------------------------
+COMO CONFIRMAR O COMPLETAR UN COLOR
+---------------------------------------------------------------------
+1. Abre la app o el sitio oficial del banco y toma una captura del
+   logo o del boton principal.
+2. Con un gotero (Chrome: DevTools > inspeccionar > clic en el cuadro
+   de color; o PowerToys "Color Picker" en Windows) toma el hex.
+3. Captura ese hex en "Otro / personalizado" o en tu constants.js.
+4. Si dudas entre dos tonos, usa el del boton principal de la app:
+   es el que ves todos los dias.
+
+NOTAS DE DISENO
+  - Usa solo colores, no logos: son marcas registradas.
+  - Los colores claros (amarillo, lima, verde claro) necesitan texto
+    oscuro para mantener contraste minimo de 4.5:1.
+  - A Revolut y BBVA ponles borde claro (1 px, blanco al 25%) en el
+    selector, o se pierden contra el fondo negro.
+
+---------------------------------------------------------------------
+PROMPT PARA OPENCODE
+---------------------------------------------------------------------
+Lee docs/PLAN.md, AGENTS.md y design-system/MASTER.md. Tarea: ampliar
+el selector "Banco / Estilo visual".
+
+1. En lib/constants.js crea un arreglo BANK_STYLES con
+   { id, label, group, color, textColor, accent?, status }, donde
+   status es 'verified' | 'memory' | 'pending'. Agrupa en: Neobancos
+   MX, Bancos MX, Inversion MX, Internacional. Conserva Nu, Revolut,
+   Mercado Pago, BBVA y Efectivo, y NO cambies el estilo de las cuentas
+   ya creadas.
+2. Los bancos sin dato (pending) se muestran con color neutro y la
+   etiqueta "Color pendiente"; el usuario podra personalizarlos.
+3. AccountForm: buscador, secciones por grupo y la opcion "Otro /
+   personalizado" con selector de color y nombre libre. Cada circulo
+   de color con borde claro para que se vea sobre fondo oscuro.
+4. Calcula textColor (claro u oscuro) por contraste, minimo 4.5:1, en
+   lib/ y con pruebas. Los colores de banco solo viven en
+   components/wallet y en este selector.
+5. Nada de logos, solo colores. No inventes colores.
+Al terminar corre npm test, npm run build y npm run lint (0 warnings).
+NO hagas commit.
+
+(Pega debajo la tabla de este archivo.)

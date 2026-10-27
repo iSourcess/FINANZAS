@@ -27,14 +27,24 @@ import {
   TrendingUp,
   Clock,
   Sparkles,
+  Scale,
+  Bookmark,
 } from 'lucide-react'
 import { useMovements } from '../../store/useMovements.js'
 import { useAccounts } from '../../store/useAccounts.js'
+import { useTemplates } from '../../store/useTemplates.js'
+import { useSettings } from '../../store/useSettings.js'
 import MovementForm from '../../components/forms/MovementForm.jsx'
+import TemplateChipsRow from '../../components/forms/TemplateChipsRow.jsx'
+import TemplateFormModal from '../../components/forms/TemplateFormModal.jsx'
+import ReconcileModal from '../../components/wallet/ReconcileModal.jsx'
 import Toast from '../../components/ui/Toast.jsx'
 import Modal from '../../components/ui/Modal.jsx'
+import { applyTemplate } from '../../domain/templates.js'
 import { formatMoney } from '../../lib/format.js'
+import { accountLabel, todayLocalISO } from '../../lib/format.js'
 import { getCardTheme } from '../../lib/constants.js'
+import { getReconcileReasonLabel } from '../../domain/reconcile.js'
 
 const ICON_MAP = {
   UtensilsCrossed,
@@ -64,17 +74,39 @@ export default function RegisterPage() {
   } = useMovements()
 
   const { accounts, fetchAccounts } = useAccounts()
+  const {
+    templates,
+    fetchTemplates,
+    addTemplate,
+    updateTemplate,
+    deleteTemplate,
+    incrementUseCount,
+  } = useTemplates()
+  const { settings, fetchSettings } = useSettings()
 
   const [editingMovement, setEditingMovement] = useState(null)
+  const [editingAdjustment, setEditingAdjustment] = useState(null)
+  const [formDraftMovement, setFormDraftMovement] = useState(null)
+  const [formKey, setFormKey] = useState(0)
+
+  // Modales de plantillas
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
+  const [templateToEdit, setTemplateToEdit] = useState(null)
+
+  // Toast
   const [toastMessage, setToastMessage] = useState('')
+  const [toastAction, setToastAction] = useState(null)
+  const [toastUndo, setToastUndo] = useState(null)
 
   useEffect(() => {
     fetchMovements()
     fetchAccounts()
-  }, [fetchMovements, fetchAccounts])
+    fetchTemplates()
+    fetchSettings()
+  }, [fetchMovements, fetchAccounts, fetchTemplates, fetchSettings])
 
-  // Filtrar movimientos del día de hoy
-  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  // Filtrar movimientos del día de hoy (fecha en hora local)
+  const todayStr = useMemo(() => todayLocalISO(), [])
   const todayMovements = useMemo(() => {
     return movements.filter(m => m.date === todayStr)
   }, [movements, todayStr])
@@ -88,32 +120,132 @@ export default function RegisterPage() {
     return new Map(categories.map(c => [c.id, c]))
   }, [categories])
 
-  // Guardar nuevo movimiento
-  const handleSaveMovement = async (data) => {
+  // Abrir modal para guardar movimiento como plantilla
+  const handleOpenCreateTemplateFromMovement = (movementData) => {
+    const cat = categoriesMap.get(movementData.categoryId)
+    const defaultName = movementData.note || cat?.name || 'Plantilla frecuente'
+    setTemplateToEdit({
+      name: defaultName,
+      type: movementData.type || 'expense',
+      amountCents: movementData.amount || null,
+      currency: movementData.currency || 'MXN',
+      categoryId: movementData.categoryId || null,
+      accountId: movementData.accountId || null,
+      note: movementData.note || '',
+    })
+    setIsTemplateModalOpen(true)
+  }
+
+  // Guardar nuevo movimiento o actualización
+  const handleSaveMovement = async (data, templateMeta) => {
     if (editingMovement) {
       await updateMovement(editingMovement.id, data)
       setEditingMovement(null)
       setToastMessage('Movimiento actualizado.')
+      setToastAction(null)
+      setToastUndo(null)
     } else {
       await addMovement(data)
-      setToastMessage('Movimiento registrado.')
+      if (templateMeta?.saveAsTemplate) {
+        const cat = categoriesMap.get(data.categoryId)
+        const tplName = templateMeta.templateName || data.note || cat?.name || 'Plantilla frecuente'
+        await addTemplate({
+          name: tplName,
+          type: data.type,
+          amountCents: data.amount,
+          currency: data.currency || 'MXN',
+          categoryId: data.categoryId || null,
+          accountId: data.accountId || null,
+          note: data.note || '',
+        })
+        setToastMessage('Movimiento y plantilla guardados.')
+        setToastAction(null)
+      } else {
+        setToastMessage('Movimiento registrado.')
+        setToastAction({
+          label: 'Guardar plantilla',
+          icon: Bookmark,
+          onClick: () => handleOpenCreateTemplateFromMovement(data),
+        })
+      }
+      setToastUndo(null)
+      setFormDraftMovement(null)
     }
   }
 
-  // Eliminar movimiento
-  const handleDeleteMovement = async (id) => {
+  // Tap en chip de plantilla
+  const handleSelectTemplate = async (template) => {
+    await incrementUseCount(template.id)
+    const isInstant = settings?.templateTapBehavior === 'instant' && template.amountCents !== null
+
+    if (isInstant) {
+      const draft = applyTemplate(template)
+      const newId = await addMovement(draft)
+      setToastMessage(`Registrado: ${template.name}`)
+      setToastAction(null)
+      setToastUndo(async () => {
+        await deleteMovement(newId)
+        setToastMessage('Registro deshecho.')
+        setToastUndo(null)
+      })
+    } else {
+      const draft = applyTemplate(template)
+      setFormDraftMovement(draft)
+      setFormKey(k => k + 1)
+    }
+  }
+
+  // Editar plantilla desde chip "⋯"
+  const handleEditTemplateFromChip = (template) => {
+    setTemplateToEdit(template)
+    setIsTemplateModalOpen(true)
+  }
+
+  // Eliminar plantilla desde chip "⋯"
+  const handleDeleteTemplateFromChip = async (template) => {
+    if (window.confirm(`¿Eliminar la plantilla "${template.name}"?`)) {
+      await deleteTemplate(template.id)
+      setToastMessage('Plantilla eliminada.')
+      setToastAction(null)
+      setToastUndo(null)
+    }
+  }
+
+  // Guardar plantilla desde modal
+  const handleSaveTemplateModal = async (templateData) => {
+    if (templateToEdit?.id) {
+      await updateTemplate(templateToEdit.id, templateData)
+      setToastMessage('Plantilla actualizada.')
+    } else {
+      await addTemplate(templateData)
+      setToastMessage('Plantilla guardada.')
+    }
+    setToastAction(null)
+    setToastUndo(null)
+    setIsTemplateModalOpen(false)
+    setTemplateToEdit(null)
+  }
+
+  // Eliminar movimiento con confirmación
+  const handleDeleteMovement = async (id, name) => {
+    const label = name || 'este movimiento'
+    if (!window.confirm(`¿Eliminar ${label}? Esta acción se puede deshacer.`)) return
     await deleteMovement(id)
     setToastMessage('Movimiento eliminado.')
+    setToastAction(null)
+    setToastUndo(handleUndo)
   }
 
   // Deshacer eliminación
   const handleUndo = async () => {
     await undoDelete()
     setToastMessage('Movimiento restaurado.')
+    setToastUndo(null)
+    setToastAction(null)
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-2xl mx-auto flex flex-col gap-6">
+    <div className="p-4 sm:p-6 pb-10 max-w-2xl mx-auto flex flex-col gap-6">
       {/* ── Encabezado ── */}
       <div>
         <h1
@@ -131,10 +263,26 @@ export default function RegisterPage() {
         </p>
       </div>
 
-      {/* ── Formulario de Registro ── */}
-      <MovementForm
+      {/* ── Fila de Plantillas Frecuentes ── */}
+      <TemplateChipsRow
+        templates={templates}
         accounts={accounts}
         categories={categories}
+        onSelectTemplate={handleSelectTemplate}
+        onEditTemplate={handleEditTemplateFromChip}
+        onDeleteTemplate={handleDeleteTemplateFromChip}
+        onCreateTemplate={() => {
+          setTemplateToEdit(null)
+          setIsTemplateModalOpen(true)
+        }}
+      />
+
+      {/* ── Formulario de Registro ── */}
+      <MovementForm
+        key={formKey}
+        accounts={accounts}
+        categories={categories}
+        initialMovement={formDraftMovement}
         onSave={handleSaveMovement}
       />
 
@@ -178,13 +326,23 @@ export default function RegisterPage() {
               const account = accountsMap.get(movement.accountId)
               const destAccount = movement.toAccountId ? accountsMap.get(movement.toAccountId) : null
 
-              const IconComp = movement.type === 'transfer'
+              const isIncome = movement.type === 'income'
+              const isTransfer = movement.type === 'transfer'
+              const isAdjustment = movement.type === 'adjustment'
+
+              const IconComp = isAdjustment
+                ? Scale
+                : isTransfer
                 ? ArrowRightLeft
                 : (category?.icon && ICON_MAP[category.icon] ? ICON_MAP[category.icon] : MoreHorizontal)
 
               const theme = account ? getCardTheme(account.themeKey) : null
-              const isIncome = movement.type === 'income'
-              const isTransfer = movement.type === 'transfer'
+
+              // Para ajuste: delta con signo
+              const deltaCents = isAdjustment
+                ? (movement.deltaCents !== undefined && movement.deltaCents !== null ? movement.deltaCents : movement.amount)
+                : 0
+              const adjSign = deltaCents > 0 ? '+' : deltaCents < 0 ? '-' : ''
 
               return (
                 <div
@@ -195,12 +353,16 @@ export default function RegisterPage() {
                     border: '1px solid var(--border-subtle)',
                   }}
                 >
-                  {/* Ícono de categoría / transferencia */}
+                  {/* Ícono de categoría / transferencia / ajuste */}
                   <div className="flex items-center gap-3 min-w-0">
                     <span
-                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                        isAdjustment ? 'text-[var(--orange-400)]' : 'text-white'
+                      }`}
                       style={{
-                        background: isTransfer
+                        background: isAdjustment
+                          ? 'var(--orange-900)'
+                          : isTransfer
                           ? 'var(--bg-overlay)'
                           : (category?.color || 'var(--orange-400)'),
                       }}
@@ -208,10 +370,10 @@ export default function RegisterPage() {
                       <IconComp size={18} />
                     </span>
 
-                    {/* Detalle: Nota / Categoría y Cuenta */}
+                    {/* Detalle: Nota / Categoría / Ajuste y Cuenta */}
                     <div className="min-w-0">
                       <span className="block text-sm font-semibold text-white truncate">
-                        {movement.note || (isTransfer ? 'Transferencia' : category?.name || 'Movimiento')}
+                        {movement.note || (isAdjustment ? 'Ajuste de saldo' : isTransfer ? 'Transferencia' : category?.name || 'Movimiento')}
                       </span>
                       <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] mt-0.5">
                         {theme && (
@@ -222,8 +384,10 @@ export default function RegisterPage() {
                         )}
                         <span className="truncate">
                           {isTransfer
-                            ? `${account?.name || 'Origen'} → ${destAccount?.name || 'Destino'}`
-                            : account?.name || 'Cuenta'}
+                            ? `${accountLabel(account)} → ${accountLabel(destAccount)}`
+                            : isAdjustment
+                            ? `${accountLabel(account)} • ${getReconcileReasonLabel(movement.reason)}`
+                            : accountLabel(account)}
                         </span>
                       </div>
                     </div>
@@ -235,32 +399,47 @@ export default function RegisterPage() {
                       <span
                         className="block font-bold text-sm sm:text-base font-mono"
                         style={{
-                          color: isIncome
+                          color: isIncome || (isAdjustment && deltaCents > 0)
                             ? 'var(--orange-400)'
+                            : isAdjustment && deltaCents < 0
+                            ? 'var(--red-400)'
                             : isTransfer
                             ? 'var(--text-secondary)'
                             : 'var(--text-primary)',
                           fontVariantNumeric: 'tabular-nums',
                         }}
                       >
-                        {isIncome ? '+' : isTransfer ? '' : '-'}{formatMoney(movement.amount, movement.currency)}
+                        {isAdjustment
+                          ? `${adjSign}${formatMoney(Math.abs(deltaCents), movement.currency)}`
+                          : `${isIncome ? '+' : isTransfer ? '' : '-'}${formatMoney(movement.amount, movement.currency)}`}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => setEditingMovement(movement)}
+                        onClick={() => {
+                          if (isAdjustment) {
+                            setEditingAdjustment(movement)
+                          } else {
+                            setEditingMovement(movement)
+                          }
+                        }}
                         aria-label="Editar movimiento"
-                        className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-white transition-colors"
+                        className="flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-white transition-colors"
+                        style={{ minWidth: '44px', minHeight: '44px' }}
                       >
                         <Edit2 size={15} />
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDeleteMovement(movement.id)}
+                        onClick={() => handleDeleteMovement(
+                          movement.id,
+                          movement.note || category?.name
+                        )}
                         aria-label="Eliminar movimiento"
-                        className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--red-400)] transition-colors"
+                        className="flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--red-400)] transition-colors"
+                        style={{ minWidth: '44px', minHeight: '44px' }}
                       >
                         <Trash2 size={15} />
                       </button>
@@ -290,13 +469,44 @@ export default function RegisterPage() {
         </Modal>
       )}
 
-      {/* ── Toast con soporte para Deshacer ── */}
+      {/* ── Modal de Edición de Ajuste de Saldo ── */}
+      {editingAdjustment && (
+        <ReconcileModal
+          account={accountsMap.get(editingAdjustment.accountId)}
+          isOpen={Boolean(editingAdjustment)}
+          initialAdjustment={editingAdjustment}
+          onClose={() => setEditingAdjustment(null)}
+          onSuccess={(msg) => {
+            setToastMessage(msg)
+            setToastAction(null)
+            setToastUndo(null)
+          }}
+        />
+      )}
+
+      {/* ── Modal de Crear / Editar Plantilla ── */}
+      <TemplateFormModal
+        isOpen={isTemplateModalOpen}
+        onClose={() => {
+          setIsTemplateModalOpen(false)
+          setTemplateToEdit(null)
+        }}
+        onSave={handleSaveTemplateModal}
+        template={templateToEdit}
+        accounts={accounts}
+        categories={categories}
+      />
+
+      {/* ── Toast con soporte para Acción y Deshacer ── */}
       {toastMessage && (
         <Toast
           message={toastMessage}
-          onUndo={lastDeleted ? handleUndo : null}
+          action={toastAction}
+          onUndo={toastUndo || (lastDeleted ? handleUndo : null)}
           onClose={() => {
             setToastMessage('')
+            setToastAction(null)
+            setToastUndo(null)
             clearLastDeleted()
           }}
         />

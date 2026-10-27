@@ -26,4 +26,14 @@ describe('Domain: currency conversion', () => {
     expect(convertCurrency(0, 20.0, 'USD', 'MXN')).toBe(0)
     expect(convertCurrency(null, 20.0, 'USD', 'MXN')).toBe(0)
   })
+
+  it('uses active rate provider when fxRate is not provided', async () => {
+    const { setRateProvider } = await import('../src/domain/currency.js')
+    setRateProvider((curr) => (curr === 'USD' ? 19.0 : 21.0))
+
+    // Sin pasar fxRate (o pasando null), debe resolver con la tasa del provider
+    expect(convertCurrency(1000, null, 'USD', 'MXN')).toBe(19000)
+    expect(convertCurrency(1000, undefined, 'EUR', 'MXN')).toBe(21000)
+  })
 })
+

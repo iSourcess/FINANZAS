@@ -6,7 +6,10 @@
  * REGLA ESTRICTA:
  *   Los montos se reciben en CENTAVOS ENTEROS (ej: 12550 = $125.50).
  *   Todos los números de salida usan formato legible con números tabulares.
+ *   Las fechas de hoy/ayer se calculan en hora local (nunca toISOString()).
  */
+
+import { format } from 'date-fns'
 
 /**
  * Formatea un monto en centavos a cadena con símbolo de moneda y separador de miles.
@@ -118,4 +121,43 @@ export function formatDate(isoDate) {
 export function formatCardDigits(last4) {
   if (!last4) return '••••'
   return `•••• ${String(last4).slice(-4)}`
+}
+
+/**
+ * Devuelve la etiqueta de cuenta con tipo de cuenta incluido.
+ * Formato: "Nombre · Tipo" (ej: "Revolut · Crédito")
+ *
+ * @param {Object|null|undefined} account - Objeto de cuenta { name, type }
+ * @returns {string}
+ */
+export function accountLabel(account) {
+  if (!account) return 'Cuenta desconocida'
+  const typeLabels = {
+    credit: 'Crédito',
+    debit: 'Débito',
+    cash: 'Efectivo',
+    savings: 'Ahorro',
+  }
+  const typeName = typeLabels[account.type] || account.type || ''
+  if (!typeName) return account.name || 'Cuenta'
+  return `${account.name} · ${typeName}`
+}
+
+/**
+ * Devuelve la fecha de hoy en hora local como 'YYYY-MM-DD'.
+ * Nunca usa toISOString() para evitar desfase UTC.
+ * @returns {string}
+ */
+export function todayLocalISO() {
+  return format(new Date(), 'yyyy-MM-dd')
+}
+
+/**
+ * Devuelve la fecha de ayer en hora local como 'YYYY-MM-DD'.
+ * @returns {string}
+ */
+export function yesterdayLocalISO() {
+  const d = new Date()
+  d.setDate(d.getDate() - 1)
+  return format(d, 'yyyy-MM-dd')
 }

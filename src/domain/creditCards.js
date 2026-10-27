@@ -12,6 +12,7 @@
 
 import { toISODate, fromISODate } from './periods.js'
 import { calculatePendingMsiDebt, calculateMsiProgress } from './msi.js'
+import { differenceInCalendarDays } from 'date-fns'
 
 /**
  * Obtiene el último día válido para un año y mes específicos (ej. 28/29 en feb, 30 en nov).
@@ -126,13 +127,11 @@ export function getCreditCardStatus({
   const nextCutDate = getNextCutDate(cutDay, referenceDate)
   const nextPayDate = getNextPayDate(payDay, cutDay, referenceDate)
 
-  const refDayTime = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate()).getTime()
-  const cutDayTime = fromISODate(nextCutDate).getTime()
-  const payDayTime = fromISODate(nextPayDate).getTime()
-
-  const msPerDay = 1000 * 60 * 60 * 24
-  const daysToCut = Math.max(0, Math.round((cutDayTime - refDayTime) / msPerDay))
-  const daysToPay = Math.max(0, Math.round((payDayTime - refDayTime) / msPerDay))
+  // differenceInCalendarDays compara solo la parte de fecha (sin hora),
+  // evitando el error de +1 día que ocurre al comparar medianoche con mediodía.
+  const refDateOnly = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate())
+  const daysToCut = Math.max(0, differenceInCalendarDays(fromISODate(nextCutDate), refDateOnly))
+  const daysToPay = Math.max(0, differenceInCalendarDays(fromISODate(nextPayDate), refDateOnly))
 
   // 5. Lista detallada de compras MSI activas en esta tarjeta
   const cardMovements = movements.filter(m => m.accountId === account.id && m.msi && m.type === 'expense')

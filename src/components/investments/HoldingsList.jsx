@@ -78,13 +78,13 @@ export default function HoldingsList({
           <Button
             variant="ghost"
             size="sm"
-            icon={RefreshCw}
             onClick={onRefresh}
             disabled={refreshing}
-            className={refreshing ? 'animate-spin' : ''}
             title="Actualizar cotizaciones en vivo"
+            className="flex items-center gap-1.5"
           >
-            {refreshing ? 'Actualizando...' : 'Actualizar'}
+            <RefreshCw size={14} className={refreshing ? 'animate-spin text-[var(--orange-400)]' : ''} />
+            <span>{refreshing ? 'Actualizando...' : 'Actualizar'}</span>
           </Button>
 
           <Button
@@ -221,7 +221,7 @@ export default function HoldingsList({
                   </div>
                 </div>
 
-                {/* ── Métricas Clave (Cantidad, Costo, Precio y 24h) ── */}
+                {/* ── Métricas Clave (Total invertido, Valor actual, Precio y 24h) ── */}
                 <div
                   className="grid grid-cols-2 gap-2 p-2.5 rounded-lg text-[11px] font-mono"
                   style={{
@@ -231,22 +231,28 @@ export default function HoldingsList({
                   }}
                 >
                   <div>
-                    <span className="text-[var(--text-muted)] block text-[10px]">Títulos</span>
+                    <span className="text-[var(--text-muted)] block text-[10px]">Total invertido</span>
                     <span className="text-white font-semibold">
-                      {item.quantity} {item.symbol}
+                      {formatMoney(item.totalCostCentsOrig, item.currency)}
+                    </span>
+                    <span className="text-[10px] text-[var(--text-muted)] block">
+                      ({item.quantity} títulos)
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-[var(--text-muted)] block text-[10px]">Costo promedio</span>
-                    <span className="text-white">
-                      {formatMoney(item.avgCostCents, item.currency)}
+                    <span className="text-[var(--text-muted)] block text-[10px]">Valor actual</span>
+                    <span className="text-white font-bold">
+                      {formatMoney(item.currentTotalCentsOrig, item.currency)}
+                    </span>
+                    <span className="text-[10px] text-[var(--text-muted)] block">
+                      ≈ {formatMoney(item.currentTotalCentsMXN, 'MXN')}
                     </span>
                   </div>
 
                   <div>
                     <span className="text-[var(--text-muted)] block text-[10px]">Precio unitario</span>
-                    <span className="text-white font-bold">
+                    <span className="text-white font-medium">
                       ${item.currentUnitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.currency}
                     </span>
                   </div>

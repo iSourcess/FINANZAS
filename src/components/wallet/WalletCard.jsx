@@ -27,6 +27,7 @@ import { calculatePendingMsiDebt } from '../../domain/msi.js'
 
 export default function WalletCard({
   account,
+  childAccounts = [],
   onClick,
   isStacked = false,
   stackOffset = 0,
@@ -116,7 +117,7 @@ export default function WalletCard({
         minHeight: isStacked ? '84px' : '180px',
         padding: '18px 20px',
         boxShadow: dragShadow,
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        border: isCredit ? '1.5px solid rgba(255, 255, 255, 0.28)' : '1px solid rgba(255, 255, 255, 0.1)',
         transform: dndStyle.transform
           ? `${dndStyle.transform} ${isDragging ? 'scale(1.03)' : ''}`
           : dragScale,
@@ -126,35 +127,47 @@ export default function WalletCard({
     >
       {/* ── Fila Superior: Nombre y Tipo ── */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {/* Nombre: no truncar con puntos, reducir fuente si es largo */}
           <span
             style={{
               fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: '18px',
+              fontSize: account.name.length > 12 ? '14px' : '18px',
               fontWeight: 700,
               letterSpacing: '-0.02em',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              maxWidth: '160px',
             }}
           >
             {account.name}
           </span>
           <span
-            className="px-2 py-0.5 rounded-full text-xs font-semibold"
+            className="px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 flex items-center gap-1"
             style={{
-              background: badgeBg,
-              border: `1px solid ${badgeBorder}`,
-              color: textColor,
+              background: isCredit
+                ? (isDarkText ? '#0A0A0A' : '#FFFFFF')
+                : badgeBg,
+              border: isCredit
+                ? (isDarkText ? '1px solid rgba(255, 255, 255, 0.2)' : '1px solid rgba(0, 0, 0, 0.15)')
+                : `1px solid ${badgeBorder}`,
+              color: isCredit
+                ? (isDarkText ? '#FFFFFF' : '#0A0A0A')
+                : textColor,
               fontSize: '10px',
               fontFamily: "'DM Sans', sans-serif",
               textTransform: 'uppercase',
               letterSpacing: '0.04em',
             }}
           >
+            {isCredit && <CreditCard size={10} aria-hidden="true" />}
             {typeLabel}
           </span>
         </div>
 
         {/* Íconos chip / contactless */}
-        <div className="flex items-center gap-2 opacity-80" aria-hidden="true">
+        <div className="flex items-center gap-2 opacity-80 flex-shrink-0" aria-hidden="true">
           <Wifi size={16} className="rotate-90" />
           <CreditCard size={18} />
         </div>
@@ -162,6 +175,7 @@ export default function WalletCard({
 
       {/* ── Fila Media: Dígitos de tarjeta y Badge de Rendimiento ── */}
       <div className="mt-3 flex items-center justify-between">
+        {/* white-space nowrap evita que los dígitos salten de línea */}
         <span
           style={{
             fontFamily: "'Space Grotesk', monospace",
@@ -169,6 +183,7 @@ export default function WalletCard({
             letterSpacing: '0.12em',
             color: subtleTextColor,
             fontVariantNumeric: 'tabular-nums',
+            whiteSpace: 'nowrap',
           }}
         >
           {formatCardDigits(account.last4)}
@@ -210,6 +225,14 @@ export default function WalletCard({
           >
             {formatMoney(account.balance, account.currency)}
           </span>
+          {childAccounts.length > 0 && !isStacked && (
+            <span
+              className="inline-block mt-0.5 text-[11px] font-semibold opacity-90"
+              style={{ color: subtleTextColor }}
+            >
+              + {childAccounts.length} {childAccounts.length === 1 ? 'caja' : 'cajas'} ({formatMoney(childAccounts.reduce((sum, c) => sum + (c.balance || 0), 0), account.currency)})
+            </span>
+          )}
         </div>
 
         {isCredit && limit > 0 && (

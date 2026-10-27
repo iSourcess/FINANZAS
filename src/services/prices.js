@@ -13,6 +13,7 @@
  */
 
 import { db } from '../db/database.js'
+import { todayLocalISO } from '../lib/format.js'
 
 // Mapeo de símbolos cripto a IDs de CoinGecko
 const COINGECKO_MAP = {
@@ -86,7 +87,7 @@ export async function fetchCryptoPrices(symbols = ['BTC', 'ETH']) {
           }
           results.set(sym.toUpperCase(), item)
 
-          // Guardar en caché local
+          // Guardar en caché local y en histórico diario
           try {
             await db.priceCache.put({
               symbol: sym.toUpperCase(),
@@ -95,6 +96,15 @@ export async function fetchCryptoPrices(symbols = ['BTC', 'ETH']) {
               change24h: item.change24h,
               fetchedAt: item.fetchedAt,
             })
+            if (db.priceHistory) {
+              const todayStr = todayLocalISO()
+              await db.priceHistory.put({
+                symbol: sym.toUpperCase(),
+                date: todayStr,
+                price: item.price,
+                updatedAt: item.fetchedAt,
+              })
+            }
           } catch (cacheErr) {
             console.warn('[pricesService] Error actualizando caché cripto:', cacheErr)
           }
@@ -164,7 +174,7 @@ export async function fetchStockPrices(symbols = DEFAULT_STOCKS, apiKeyOverride 
           }
           results.set(symbolClean, item)
 
-          // Guardar en caché local
+          // Guardar en caché local y en histórico diario
           try {
             await db.priceCache.put({
               symbol: symbolClean,
@@ -173,6 +183,15 @@ export async function fetchStockPrices(symbols = DEFAULT_STOCKS, apiKeyOverride 
               change24h: item.change24h,
               fetchedAt: item.fetchedAt,
             })
+            if (db.priceHistory) {
+              const todayStr = todayLocalISO()
+              await db.priceHistory.put({
+                symbol: symbolClean,
+                date: todayStr,
+                price: item.price,
+                updatedAt: item.fetchedAt,
+              })
+            }
           } catch (cacheErr) {
             console.warn('[pricesService] Error actualizando caché acción:', cacheErr)
           }
@@ -247,3 +266,30 @@ export async function getAllPrices(symbols = ['BTC', 'ETH', 'NFLX', 'INTC', 'AMD
     hasFinnhubKey,
   }
 }
+
+/**
+ * Carga todo el histórico de precios registrado en Dexie como un Map
+ * indexado por `${symbol}_${date}` -> price (en USD).
+ *
+ * @param {Array<string>} [symbols=[]]
+ * @returns {Promise<Map<string, number>>}
+ */
+export async function getPriceHistoryMap(symbols = []) {
+  const map = new Map()
+  try {
+    if (!db.priceHistory) return map
+    const records = await db.priceHistory.toArray()
+    const filterUpper = symbols.map(s => s.toUpperCase())
+
+    for (const r of records) {
+      const sym = (r.symbol || '').toUpperCase()
+      if (filterUpper.length === 0 || filterUpper.includes(sym)) {
+        map.set(`${sym}_${r.date}`, Number(r.price) || 0)
+      }
+    }
+  } catch (err) {
+    console.warn('[pricesService] Error al leer priceHistory:', err)
+  }
+  return map
+}
+

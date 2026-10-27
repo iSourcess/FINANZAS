@@ -13,16 +13,18 @@ import { useState } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { formatMoney } from '../../lib/format.js'
 
-// Escala de naranjas del sistema de diseño para donut slots
-const ORANGE_DONUT_PALETTE = [
-  '#FF7A1A', // --donut-1
-  '#FF9A45', // --donut-2
-  '#FFBA80', // --donut-3
-  '#FFE0C0', // --donut-4
-  '#C45200', // --donut-5
-  '#8A3A00', // --donut-6
-  '#F59E0B', // --donut-7
-  '#6B6B6B', // --donut-8
+// Paleta de 9 tonos distinguibles (naranjas, ámbar y neutros) — alineados con tokens CSS.
+// Se asigna siempre por índice de posición para garantizar colores únicos por categoría.
+const DONUT_PALETTE = [
+  '#FF7A1A', // --donut-1: naranja principal
+  '#C45200', // --donut-5: naranja oscuro (más distinto que donut-2)
+  '#F59E0B', // --donut-7: ámbar
+  '#FF9A45', // --donut-2: naranja medio
+  '#8A3A00', // --donut-6: marrón oscuro
+  '#FFBA80', // --donut-3: naranja claro
+  '#9CA3AF', // --donut-9: gris azulado
+  '#6B6B6B', // --donut-8: gris neutro
+  '#FFE0C0', // --donut-4: melocotón claro
 ]
 
 export default function DonutChart({
@@ -46,13 +48,13 @@ export default function DonutChart({
     )
   }
 
-  // Mapear datos para Recharts (montos en pesos para la gráfica)
+  // Asignar color siempre por índice — nunca hereda el color de la categoría para evitar colisiones
   const chartData = categoryBreakdown.map((item, idx) => ({
     name: item.name,
     value: item.amount / 100, // pesos
     cents: item.amount,
     percentage: item.percentage,
-    color: item.color || ORANGE_DONUT_PALETTE[idx % ORANGE_DONUT_PALETTE.length],
+    color: DONUT_PALETTE[idx % DONUT_PALETTE.length],
   }))
 
   const activeItem = activeIndex !== null ? chartData[activeIndex] : null
