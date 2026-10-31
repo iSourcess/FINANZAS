@@ -35,6 +35,8 @@ export function calculatePeriodSummaries({
   prevStartDate = null,
   prevEndDate = null,
   fxRate = 20.0,
+  accrualsTotalCents = 0,
+  countInterestAsIncome = false,
 }) {
   // Mapa de categorías para acceso O(1)
   const categoryMap = new Map(categories.map(c => [c.id, c]))
@@ -76,6 +78,11 @@ export function calculatePeriodSummaries({
       bucket.expense += amountMXN
     }
   })
+
+  const movementIncome = totalIncome
+  if (countInterestAsIncome && accrualsTotalCents > 0) {
+    totalIncome += accrualsTotalCents
+  }
 
   const balance = totalIncome - totalExpense
 
@@ -153,6 +160,9 @@ export function calculatePeriodSummaries({
 
   return {
     totalIncome, // centavos MXN
+    movementIncome, // centavos MXN (solo movimientos)
+    accrualsTotalCents: accrualsTotalCents || 0,
+    countInterestAsIncome: Boolean(countInterestAsIncome),
     totalExpense, // centavos MXN
     balance, // centavos MXN
     categoryBreakdown,

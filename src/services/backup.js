@@ -105,6 +105,7 @@ export async function exportDatabaseToJSON() {
       recurringIncomeOccurrences,
       debts,
       debtPayments,
+      interestAccruals,
     ] = await Promise.all([
       db.accounts.toArray(),
       db.movements.toArray(),
@@ -120,6 +121,7 @@ export async function exportDatabaseToJSON() {
       db.recurringIncomeOccurrences ? db.recurringIncomeOccurrences.toArray().catch(() => []) : Promise.resolve([]),
       db.debts ? db.debts.toArray().catch(() => []) : Promise.resolve([]),
       db.debtPayments ? db.debtPayments.toArray().catch(() => []) : Promise.resolve([]),
+      db.interestAccruals ? db.interestAccruals.toArray().catch(() => []) : Promise.resolve([]),
     ])
 
     const timestamp = new Date().toISOString()
@@ -146,6 +148,7 @@ export async function exportDatabaseToJSON() {
         recurringIncomeOccurrences,
         debts,
         debtPayments,
+        interestAccruals,
       },
     }
 
@@ -291,6 +294,7 @@ export function validateBackupJSON(jsonString) {
       budgetsCount: Array.isArray(data.budgets) ? data.budgets.length : 0,
       fixedExpensesCount: Array.isArray(data.fixedExpenses) ? data.fixedExpenses.length : 0,
       holdingsCount: Array.isArray(data.holdings) ? data.holdings.length : 0,
+      interestAccrualsCount: Array.isArray(data.interestAccruals) ? data.interestAccruals.length : 0,
       exportedAt: parsed.exportedAt || null,
     }
 
@@ -323,6 +327,7 @@ export async function restoreDatabase(data) {
     if (db.recurringIncomeOccurrences) tablesToLock.push(db.recurringIncomeOccurrences)
     if (db.debts) tablesToLock.push(db.debts)
     if (db.debtPayments) tablesToLock.push(db.debtPayments)
+    if (db.interestAccruals) tablesToLock.push(db.interestAccruals)
 
     await db.transaction(
       'rw',
@@ -344,6 +349,7 @@ export async function restoreDatabase(data) {
         if (db.recurringIncomeOccurrences) clearTasks.push(db.recurringIncomeOccurrences.clear())
         if (db.debts) clearTasks.push(db.debts.clear())
         if (db.debtPayments) clearTasks.push(db.debtPayments.clear())
+        if (db.interestAccruals) clearTasks.push(db.interestAccruals.clear())
         await Promise.all(clearTasks)
 
         // 2. Restaurar registros
@@ -390,6 +396,9 @@ export async function restoreDatabase(data) {
         }
         if (db.debtPayments && Array.isArray(data.debtPayments) && data.debtPayments.length > 0) {
           await db.debtPayments.bulkAdd(data.debtPayments)
+        }
+        if (db.interestAccruals && Array.isArray(data.interestAccruals) && data.interestAccruals.length > 0) {
+          await db.interestAccruals.bulkAdd(data.interestAccruals)
         }
       }
     )

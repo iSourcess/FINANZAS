@@ -7,7 +7,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeSchedule,
-  buildScheduledDate,
   DEFAULT_REMINDER_SETTINGS,
   REMINDER_CHANNELS,
 } from '../src/domain/reminders.js'
@@ -228,5 +227,26 @@ describe('domain/reminders.js — computeSchedule', () => {
     expect(backup[0].dateStr).toBe('2026-11-01') // Domingo 1 de noviembre
     expect(backup[0].title).toBe('Respaldo semanal recomendado')
     expect(backup[0].route).toBe('/ajustes')
+  })
+
+  it('incluye aviso de detecciones con más de 2 días en el recordatorio diario', () => {
+    const settings = {
+      reminders: {
+        dailyLog: { enabled: true, time: '21:00' },
+      },
+    }
+    const threeDaysAgo = new Date('2026-10-23T10:00:00Z').getTime()
+    const state = {
+      hasMovementToday: false,
+      movementsToday: [],
+      pendingDetections: [
+        { id: 'det-old', postedAt: threeDaysAgo, status: 'pending' },
+      ],
+    }
+
+    const schedule = computeSchedule(settings, state, refDate)
+    const daily = schedule.filter(s => s.channelId === REMINDER_CHANNELS.DAILY_LOG)
+    expect(daily.length).toBe(7)
+    expect(daily[0].body).toContain('1 movimiento detectado de hace más de 2 días por confirmar')
   })
 })

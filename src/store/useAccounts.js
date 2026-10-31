@@ -11,7 +11,6 @@
 
 import { create } from 'zustand'
 import { db } from '../db/database.js'
-import { runSeed } from '../db/seed.js'
 import { reorderAccounts as domainReorder } from '../domain/accountOrder.js'
 
 export const useAccounts = create((set, get) => ({
@@ -50,6 +49,9 @@ export const useAccounts = create((set, get) => ({
       const current = get().accounts
       const maxOrder = current.reduce((max, acc) => Math.max(max, acc.sortOrder ?? 0), 0)
 
+      const today = new Date()
+      const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
       const newAccount = {
         id: crypto.randomUUID(),
         name: accountData.name.trim(),
@@ -63,12 +65,17 @@ export const useAccounts = create((set, get) => ({
         sortOrder: maxOrder + 1,
         yieldTiers: accountData.yieldTiers || null,
         yieldCapBase: accountData.yieldCapBase || null,
+        isTurbo: accountData.isTurbo || false,
         parentId: accountData.parentId || null,
         credit: accountData.type === 'credit' ? {
           limit: Math.round(Number(accountData.credit?.limit) || 0),
           cutDay: Number(accountData.credit?.cutDay) || 1,
           payDay: Number(accountData.credit?.payDay) || 20,
         } : null,
+        // Rendimientos acreditados
+        interestEnabled: Boolean(accountData.interestEnabled),
+        interestStartDate: accountData.interestStartDate || todayISO,
+        accumulatedInterestCents: Math.round(Number(accountData.accumulatedInterestCents) || 0),
         createdAt: new Date().toISOString(),
       }
 
@@ -158,6 +165,39 @@ export const useAccounts = create((set, get) => ({
     } catch (err) {
       console.error('[useAccounts] Error al limpiar cuentas:', err)
       set({ error: 'No se pudieron limpiar las cuentas.', loading: false })
+      throw err
+    }
+  },
+
+  /**
+   * Restablece las cuentas dejando únicamente 'Efectivo'.
+   */
+  resetToCashOnly: async () => {
+    set({ loading: true, error: null })
+    try {
+      await db.accounts.clear()
+      const cashAccount = {
+        id: crypto.randomUUID(),
+        name: 'Efectivo',
+        type: 'cash',
+        currency: 'MXN',
+        balance: 0,
+        themeKey: 'cash',
+        color: null,
+        hidden: false,
+        sortOrder: 1,
+        yieldTiers: null,
+        yieldCapBase: null,
+        parentId: null,
+        credit: null,
+        createdAt: new Date().toISOString(),
+      }
+      await db.accounts.add(cashAccount)
+      set({ accounts: [cashAccount], selectedAccountId: null, loading: false })
+      return cashAccount
+    } catch (err) {
+      console.error('[useAccounts] Error al restablecer solo efectivo:', err)
+      set({ error: 'No se pudo restablecer a solo efectivo.', loading: false })
       throw err
     }
   },

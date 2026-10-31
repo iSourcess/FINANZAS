@@ -19,6 +19,7 @@ import { toISODate, fromISODate } from './periods.js'
 import { getNextCutDate, getNextPayDate } from './creditCards.js'
 import { clipDayOfMonth, generateCandidateDueDates } from './recurringIncome.js'
 import { calculateDebtRemainingCents, calculateDebtStatus } from './debts.js'
+import { countDetectionsOlderThanDays } from './detections.js'
 import { formatMoney } from '../lib/format.js'
 
 export const REMINDER_CHANNELS = {
@@ -120,10 +121,12 @@ export function computeSchedule(settings = {}, state = {}, refDate = new Date())
     movementsToday = [],
     hasMovementToday = false,
     lastBackupAt = null,
+    pendingDetections = [],
   } = state
 
   const movementRegisteredToday = hasMovementToday || (Array.isArray(movementsToday) && movementsToday.length > 0)
   const paidFixedSet = new Set(paidFixedExpenseIdsThisMonth || [])
+  const oldDetectionsCount = countDetectionsOlderThanDays(pendingDetections, 2, baseDateObj)
 
   const scheduledList = []
 
@@ -132,18 +135,23 @@ export function computeSchedule(settings = {}, state = {}, refDate = new Date())
     const time = reminderCfg.dailyLog.time || '21:00'
     for (const dateStr of windowDays) {
       // Si es hoy y ya se registró un movimiento hoy, se cancela/omite el recordatorio de hoy
-      if (dateStr === todayStr && movementRegisteredToday) {
+      // a menos que existan detecciones bancarias con más de 2 días pendientes por confirmar
+      if (dateStr === todayStr && movementRegisteredToday && oldDetectionsCount === 0) {
         continue
       }
 
       const scheduledAt = buildScheduledDate(dateStr, time)
+      const dailyBody = oldDetectionsCount > 0
+        ? `Mantén tu control financiero al día. Tienes ${oldDetectionsCount} movimiento${oldDetectionsCount > 1 ? 's' : ''} detectado${oldDetectionsCount > 1 ? 's' : ''} de hace más de 2 días por confirmar.`
+        : 'Mantén tu control financiero al día. Toca aquí para registrar tus movimientos de hoy.'
+
       scheduledList.push({
         id: `daily-${dateStr}`,
         channelId: REMINDER_CHANNELS.DAILY_LOG,
         dateStr,
         scheduledAt,
         title: '¿Registraste tus gastos de hoy?',
-        body: 'Mantén tu control financiero al día. Toca aquí para registrar tus movimientos de hoy.',
+        body: dailyBody,
         route: '/registrar',
         extra: { type: 'daily_log', dateStr, route: '/registrar' },
       })

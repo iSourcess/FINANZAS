@@ -22,6 +22,8 @@ const ROUTE_ALIASES = {
   wallet: '/cuentas',
   ajustes: '/ajustes',
   settings: '/ajustes',
+  confirmar: '/ajustes',
+  confirm: '/ajustes',
 }
 
 /**

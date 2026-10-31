@@ -12,6 +12,7 @@
 
 import { NavLink, useNavigate } from 'react-router-dom'
 import { PlusCircle, BarChart2, Wallet, Settings } from 'lucide-react'
+import { useNotificationDetection } from '../../store/useNotificationDetection.js'
 
 const TABS = [
   { to: '/registrar', label: 'Registrar', Icon: PlusCircle, id: 'nav-registrar' },
@@ -21,6 +22,8 @@ const TABS = [
 
 export default function BottomNav() {
   const navigate = useNavigate()
+  const { pendingDetections } = useNotificationDetection()
+  const pendingCount = pendingDetections?.length || 0
 
   return (
     <nav
@@ -66,11 +69,37 @@ export default function BottomNav() {
         >
           {({ isActive }) => (
             <>
-              <Icon
-                size={22}
-                strokeWidth={isActive ? 2.2 : 1.8}
-                aria-hidden="true"
-              />
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon
+                  size={22}
+                  strokeWidth={isActive ? 2.2 : 1.8}
+                  aria-hidden="true"
+                />
+                {id === 'nav-registrar' && pendingCount > 0 && (
+                  <span
+                    aria-label={`${pendingCount} movimientos por confirmar`}
+                    style={{
+                      position: 'absolute',
+                      top: '-6px',
+                      right: '-10px',
+                      background: 'var(--orange-400)',
+                      color: 'var(--text-inverse)',
+                      fontSize: '9px',
+                      fontWeight: 700,
+                      lineHeight: '14px',
+                      minWidth: '14px',
+                      height: '14px',
+                      padding: '0 3px',
+                      borderRadius: '7px',
+                      textAlign: 'center',
+                      fontFamily: "'DM Sans', sans-serif",
+                      boxShadow: '0 0 6px rgba(255, 122, 26, 0.5)',
+                    }}
+                  >
+                    {pendingCount}
+                  </span>
+                )}
+              </div>
               <span
                 style={{
                   fontSize: '10px',

@@ -21,7 +21,6 @@
  */
 
 import { db } from './database.js'
-import { DEFAULT_YIELD_TIERS } from '../lib/constants.js'
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
@@ -71,179 +70,8 @@ const INCOME_CATEGORIES = [
 
 /* ── Datos de cuentas ─────────────────────────────────────── */
 
-/**
- * Tramos de rendimiento por cuenta (referencia a constants.js).
- * Se clonan para guardar en DB sin referenciar el objeto original.
- */
-function tiers(key) {
-  return JSON.parse(JSON.stringify(DEFAULT_YIELD_TIERS[key]))
-}
-
 const SEED_ACCOUNTS = [
-  /* ── Crédito ─────────────────────────────────────────────── */
-  {
-    id: uuid(),
-    name: 'Nu',
-    type: 'credit',
-    currency: 'MXN',
-    balance: 0,          // deuda en centavos (0 = sin deuda)
-    themeKey: 'nu',
-    color: null,
-    hidden: false,
-    sortOrder: 1,
-    yieldTiers: null,
-    yieldCapBase: null,
-    parentId: null,
-    credit: {
-      limit: 1_500_000,  // $15,000.00 en centavos (editable en Ajustes)
-      cutDay: 17,        // Día de corte (editable)
-      payDay: 7,         // Día límite de pago (editable)
-    },
-    createdAt: now(),
-  },
-  {
-    id: uuid(),
-    name: 'Revolut',
-    type: 'credit',
-    currency: 'MXN',
-    balance: 0,
-    themeKey: 'revolut',
-    color: null,
-    hidden: false,
-    sortOrder: 2,
-    yieldTiers: null,
-    yieldCapBase: null,
-    parentId: null,
-    credit: {
-      limit: 1_000_000,  // $10,000.00
-      cutDay: 1,
-      payDay: 21,
-    },
-    createdAt: now(),
-  },
-  {
-    id: uuid(),
-    name: 'Mercado Pago',
-    type: 'credit',
-    currency: 'MXN',
-    balance: 0,
-    themeKey: 'mercadoPago',
-    color: null,
-    hidden: false,
-    sortOrder: 3,
-    yieldTiers: null,
-    yieldCapBase: null,
-    parentId: null,
-    credit: {
-      limit: 800_000,    // $8,000.00
-      cutDay: 12,
-      payDay: 2,
-    },
-    createdAt: now(),
-  },
-
-  /* ── Débito / Ahorro ──────────────────────────────────────── */
-  {
-    id: uuid(),
-    name: 'Nu Débito',
-    type: 'debit',
-    currency: 'MXN',
-    balance: 0,
-    themeKey: 'nu',
-    color: null,
-    hidden: false,
-    sortOrder: 4,
-    yieldTiers: null,
-    yieldCapBase: null,
-    parentId: null,
-    credit: null,
-    createdAt: now(),
-  },
-  {
-    id: uuid(),
-    name: 'Cajita Turbo',
-    type: 'savings',
-    currency: 'MXN',
-    balance: 0,
-    themeKey: 'nu',
-    color: null,
-    hidden: false,
-    sortOrder: 5,
-    // Cajita Turbo: 13% hasta $25,000 con interés compuesto diario
-    yieldTiers: tiers('nuTurbo'),
-    yieldCapBase: 'principal',
-    parentId: null,
-    credit: null,
-    createdAt: now(),
-  },
-  {
-    id: uuid(),
-    name: 'Cajita Ahorro',
-    type: 'savings',
-    currency: 'MXN',
-    balance: 0,
-    themeKey: 'nu',
-    color: null,
-    hidden: false,
-    sortOrder: 6,
-    // Cajita Ahorro Nu: 7% anual sin límite
-    yieldTiers: tiers('nuCajita'),
-    yieldCapBase: 'balance',
-    parentId: null,
-    credit: null,
-    createdAt: now(),
-  },
-  {
-    id: uuid(),
-    name: 'Revolut',
-    type: 'debit',
-    currency: 'MXN',
-    balance: 0,
-    themeKey: 'revolut',
-    color: null,
-    hidden: false,
-    sortOrder: 7,
-    yieldTiers: tiers('revolut'),
-    yieldCapBase: 'balance',
-    parentId: null,
-    credit: null,
-    createdAt: now(),
-  },
-  {
-    id: uuid(),
-    name: 'Mercado Pago',
-    type: 'debit',
-    currency: 'MXN',
-    balance: 0,
-    themeKey: 'mercadoPago',
-    color: null,
-    hidden: false,
-    sortOrder: 8,
-    // Mercado Pago: 15% hasta $25,000, 5.3% excedente
-    yieldTiers: tiers('mercadoPago'),
-    yieldCapBase: 'balance',
-    parentId: null,
-    credit: null,
-    createdAt: now(),
-  },
-  {
-    id: uuid(),
-    name: 'BBVA',
-    type: 'debit',
-    currency: 'MXN',
-    balance: 0,
-    themeKey: 'bbva',
-    color: null,
-    hidden: false,
-    sortOrder: 9,
-    yieldTiers: tiers('bbva'),
-    yieldCapBase: 'balance',
-    parentId: null,
-    credit: null,
-    createdAt: now(),
-  },
-
-  /* ── Efectivo ─────────────────────────────────────────────── */
+  /* ── Efectivo (Única cuenta inicial por defecto) ──────────── */
   {
     id: uuid(),
     name: 'Efectivo',
@@ -253,7 +81,7 @@ const SEED_ACCOUNTS = [
     themeKey: 'cash',
     color: null,
     hidden: false,
-    sortOrder: 10,
+    sortOrder: 1,
     yieldTiers: null,
     yieldCapBase: null,
     parentId: null,
@@ -291,13 +119,17 @@ export async function runSeed() {
       if (!existingSettings) {
         await db.settings.add(INITIAL_SETTINGS)
       }
+      const accountCount = await db.accounts.count()
+      if (accountCount === 0) {
+        await db.accounts.bulkAdd(SEED_ACCOUNTS)
+      }
       return
     }
 
-    // Insertar categorías y configuración inicial (cuentas inician vacías para agregar manualmente)
+    // Insertar categorías, configuración y únicamente cuenta de Efectivo inicial
     await db.transaction(
       'rw',
-      [db.categories, db.settings],
+      [db.categories, db.settings, db.accounts],
       async () => {
         await db.categories.bulkAdd([
           ...EXPENSE_CATEGORIES,
@@ -308,10 +140,15 @@ export async function runSeed() {
         if (!existingSettings) {
           await db.settings.add(INITIAL_SETTINGS)
         }
+
+        const accountCount = await db.accounts.count()
+        if (accountCount === 0) {
+          await db.accounts.bulkAdd(SEED_ACCOUNTS)
+        }
       }
     )
 
-    console.info('[seed] Categorías y configuración inicializadas correctamente. Cuentas limpias.')
+    console.info('[seed] Categorías y configuración inicializadas. Solo Efectivo precargado.')
   } catch (error) {
     // No romper la app si el seed falla (p. ej. IndexedDB no disponible)
     console.error('[seed] Error al inicializar la base de datos:', error)

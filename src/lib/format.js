@@ -161,3 +161,31 @@ export function yesterdayLocalISO() {
   d.setDate(d.getDate() - 1)
   return format(d, 'yyyy-MM-dd')
 }
+
+/**
+ * Formatea un timestamp o fecha en tiempo relativo en español (ej: "hace 5 min", "hace 2 h", "hace 3 d").
+ * @param {number|string|Date|null|undefined} timestamp
+ * @param {Date|number} [nowRef=new Date()]
+ * @returns {string}
+ */
+export function formatRelativeTime(timestamp, nowRef = new Date()) {
+  if (!timestamp) return ''
+  const dateObj = typeof timestamp === 'number'
+    ? new Date(timestamp)
+    : new Date(timestamp)
+
+  if (isNaN(dateObj.getTime())) return ''
+
+  const nowMs = typeof nowRef === 'number' ? nowRef : new Date(nowRef).getTime()
+  const diffMs = Math.max(0, nowMs - dateObj.getTime())
+  const diffSec = Math.floor(diffMs / 1000)
+  const diffMin = Math.floor(diffSec / 60)
+  const diffHours = Math.floor(diffMin / 60)
+  const diffDays = Math.floor(diffHours / 24)
+
+  if (diffMin < 1) return 'hace un momento'
+  if (diffMin < 60) return `hace ${diffMin} min`
+  if (diffHours < 24) return `hace ${diffHours} h`
+  if (diffDays === 1) return 'hace 1 d'
+  return `hace ${diffDays} d`
+}

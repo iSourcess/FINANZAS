@@ -1,0 +1,127 @@
+[
+  {
+    "id": "fixture_1_expense_standard",
+    "description": "Gasto estándar con tarjeta y comercio",
+    "packageName": "com.nu.production",
+    "appLabel": "Nu",
+    "title": "Compra aprobada",
+    "text": "Tu compra por $125.50 en Starbucks con tarjeta terminada en 4321 fue exitosa.",
+    "expected": {
+      "ignored": false,
+      "amountCents": 12550,
+      "currency": "MXN",
+      "kind": "expense",
+      "merchant": "Starbucks",
+      "last4": "4321",
+      "hasAmount": true
+    }
+  },
+  {
+    "id": "fixture_2_thousands_comma",
+    "description": "Gasto con miles con coma y punto decimal",
+    "packageName": "mx.com.bbva.bancomer",
+    "appLabel": "BBVA",
+    "title": "Retiro sin tarjeta",
+    "text": "Retiro por $1,250.00 en Cajero BBVA 4521 el 15/10/2026.",
+    "expected": {
+      "ignored": false,
+      "amountCents": 125000,
+      "currency": "MXN",
+      "kind": "expense",
+      "merchant": "Cajero BBVA 4521",
+      "last4": null,
+      "hasAmount": true
+    }
+  },
+  {
+    "id": "fixture_3_usd_currency",
+    "description": "Compra internacional en USD",
+    "packageName": "com.revolut.revolut",
+    "appLabel": "Revolut",
+    "title": "Card payment",
+    "text": "You spent USD 45.00 at GitHub. Termina en 8899.",
+    "expected": {
+      "ignored": false,
+      "amountCents": 4500,
+      "currency": "USD",
+      "kind": "expense",
+      "merchant": "GitHub",
+      "last4": "8899",
+      "hasAmount": true
+    }
+  },
+  {
+    "id": "fixture_4_income_deposit",
+    "description": "Ingreso por nómina o depósito recibido",
+    "packageName": "mx.com.bbva.bancomer",
+    "appLabel": "BBVA",
+    "title": "Depósito recibido",
+    "text": "Recibiste un depósito de $15,800.00 de EMPRESA SA DE CV a tu cuenta *5678.",
+    "expected": {
+      "ignored": false,
+      "amountCents": 1580000,
+      "currency": "MXN",
+      "kind": "income",
+      "merchant": "EMPRESA SA DE CV",
+      "last4": "5678",
+      "hasAmount": true
+    }
+  },
+  {
+    "id": "fixture_5_transfer_sent",
+    "description": "Transferencia enviada",
+    "packageName": "com.nu.production",
+    "appLabel": "Nu",
+    "title": "Transferencia enviada",
+    "text": "Enviaste $350.00 a Juan Pérez vía SPEI.",
+    "expected": {
+      "ignored": false,
+      "amountCents": 35000,
+      "currency": "MXN",
+      "kind": "expense",
+      "merchant": "Juan Pérez",
+      "last4": null,
+      "hasAmount": true
+    }
+  },
+  {
+    "id": "fixture_6_no_amount",
+    "description": "Texto sin monto (aviso de seguridad o acceso)",
+    "packageName": "com.nu.production",
+    "appLabel": "Nu",
+    "title": "Nuevo inicio de sesión",
+    "text": "Detectamos un acceso a tu app Nu desde un nuevo dispositivo.",
+    "expected": {
+      "ignored": false,
+      "amountCents": null,
+      "currency": "MXN",
+      "kind": null,
+      "merchant": null,
+      "last4": null,
+      "hasAmount": false
+    }
+  },
+  {
+    "id": "fixture_7_promotion_ignored",
+    "description": "Texto publicitario o promoción que debe ignorarse",
+    "packageName": "com.mercadopago.wallet",
+    "appLabel": "Mercado Pago",
+    "title": "¡Aprovecha hoy!",
+    "text": "Obtén 20% de descuento y promoción exclusiva en tus compras de fin de semana.",
+    "expected": {
+      "ignored": true
+    }
+  },
+  {
+    "id": "fixture_8_preapproved_loan_ignored",
+    "description": "Oferta de crédito preaprobado que debe ignorarse",
+    "packageName": "mx.com.bbva.bancomer",
+    "appLabel": "BBVA",
+    "title": "Crédito preaprobado para ti",
+    "text": "Tienes un préstamo disponible por $50,000.00 con tasa fija. ¡Pídelo ya!",
+    "expected": {
+      "ignored": true
+    }
+  }
+]
+

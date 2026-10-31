@@ -49,4 +49,32 @@ describe('Services: backup and validation', () => {
     expect(result.valid).toBe(false)
     expect(result.error).toContain('no contiene datos compatibles')
   })
+
+  it('validates a backup JSON with interestAccruals included', () => {
+    const validPayload = JSON.stringify({
+      version: 1,
+      appName: 'FINANZAS',
+      exportedAt: '2026-10-18T20:00:00.000Z',
+      data: {
+        accounts: [{ id: 'a1', name: 'Nu' }],
+        movements: [{ id: 'm1', amount: 15000, date: '2026-10-15' }],
+        categories: [{ id: 'c1', name: 'Comida' }],
+        interestAccruals: [
+          {
+            id: 'ia1',
+            accountId: 'a1',
+            date: '2026-10-14',
+            amountCents: 410,
+            baseCents: 1000000,
+            rate: 0.15,
+            carryCents: 0.95,
+          },
+        ],
+      },
+    })
+
+    const result = validateBackupJSON(validPayload)
+    expect(result.valid).toBe(true)
+    expect(result.summary.interestAccrualsCount).toBe(1)
+  })
 })

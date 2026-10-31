@@ -7,6 +7,7 @@ import {
   formatMoney,
   centsToInput,
   inputToCents,
+  formatRelativeTime,
 } from '../src/lib/format.js'
 import { toISODate } from '../src/domain/periods.js'
 
@@ -71,6 +72,27 @@ describe('Lib: format helpers & local dates', () => {
 
     it('formats money in Mexican pesos', () => {
       expect(formatMoney(12550)).toContain('125.50')
+    })
+  })
+
+  describe('formatRelativeTime', () => {
+    const now = new Date('2026-10-30T15:00:00Z').getTime()
+
+    it('formatea minutos, horas y días en tiempo relativo en español', () => {
+      const justNow = now - 20 * 1000 // 20s
+      expect(formatRelativeTime(justNow, now)).toBe('hace un momento')
+
+      const fiveMins = now - 5 * 60 * 1000 // 5 min
+      expect(formatRelativeTime(fiveMins, now)).toBe('hace 5 min')
+
+      const threeHours = now - 3 * 60 * 60 * 1000 // 3 h
+      expect(formatRelativeTime(threeHours, now)).toBe('hace 3 h')
+
+      const oneDay = now - 26 * 60 * 60 * 1000 // 1 d
+      expect(formatRelativeTime(oneDay, now)).toBe('hace 1 d')
+
+      const fourDays = now - 4 * 24 * 60 * 60 * 1000 // 4 d
+      expect(formatRelativeTime(fourDays, now)).toBe('hace 4 d')
     })
   })
 })

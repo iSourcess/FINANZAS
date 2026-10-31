@@ -31,6 +31,7 @@ import {
   Bell,
   Archive,
   AlertTriangle,
+  AlertCircle,
   Clock,
   Star,
   ArrowUp,
@@ -46,7 +47,9 @@ import {
   Smartphone,
   Info,
   LayoutGrid,
+  BellRing,
 } from 'lucide-react'
+import NotificationDetectionSection from './NotificationDetectionSection.jsx'
 import { AVAILABLE_FX_PAIRS } from '../../lib/constants.js'
 import { useFx } from '../../store/useFx.js'
 import { useBudgets } from '../../store/useBudgets.js'
@@ -98,14 +101,17 @@ export default function SettingsPage() {
   } = useBudgets()
 
   const { movements, categories, fetchMovements } = useMovements()
-  const { accounts, fetchAccounts, clearAllAccounts } = useAccounts()
+  const { accounts, fetchAccounts, clearAllAccounts, resetToCashOnly } = useAccounts()
   const {
     settings,
     fetchSettings,
     setFinnhubKey,
     setFxSettings,
+    setPrimaryFxCurrency,
+    setEnabledFxCurrencies,
     setTemplateTapBehavior,
     setIncludeDebtsInNetWorth,
+    setCountInterestAsIncome,
     setShowAmountsOnWidget,
     updateReminderSettings,
   } = useSettings()
@@ -556,7 +562,7 @@ export default function SettingsPage() {
       {/* ── Contenido Principal ── */}
       <main className="p-4 sm:p-6 max-w-2xl mx-auto w-full flex flex-col gap-5 flex-1">
         {/* Selector de Sección */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-1.5 p-1 rounded-xl" style={{ background: 'var(--bg-elevated)' }}>
+        <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-1.5 p-1 rounded-xl" style={{ background: 'var(--bg-elevated)' }}>
           <button
             type="button"
             onClick={() => setActiveTab('budgets')}
@@ -616,6 +622,18 @@ export default function SettingsPage() {
           >
             <Bell size={14} />
             <span>Recordatorios</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('detection')}
+            className={`py-2 px-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-all ${
+              activeTab === 'detection'
+                ? 'bg-[var(--bg-surface)] text-[var(--orange-400)] shadow-sm'
+                : 'text-[var(--text-secondary)] hover:text-white'
+            }`}
+          >
+            <BellRing size={14} />
+            <span>Detección</span>
           </button>
           <button
             type="button"
@@ -1183,7 +1201,7 @@ export default function SettingsPage() {
               >
                 <Bookmark size={24} className="text-[var(--text-muted)] opacity-60 mb-1" />
                 <span className="font-semibold text-white">No tienes plantillas creadas todavía</span>
-                <span>Crea tu primera plantilla o activa "Guardar también como plantilla" al registrar cualquier movimiento.</span>
+                <span>Crea tu primera plantilla o activa &quot;Guardar también como plantilla&quot; al registrar cualquier movimiento.</span>
                 <Button
                   variant="outline"
                   size="sm"
@@ -1382,6 +1400,54 @@ export default function SettingsPage() {
                 aria-label="Alternar inclusión de deudas en el patrimonio"
               >
                 {settings?.includeDebtsInNetWorth ? (
+                  <ToggleRight size={28} className="text-[var(--orange-400)]" />
+                ) : (
+                  <ToggleLeft size={28} className="text-[var(--text-muted)]" />
+                )}
+              </button>
+            </div>
+
+            {/* Configuración de Rendimientos como Ingreso */}
+            <div
+              className="p-4 rounded-xl flex items-center justify-between gap-3"
+              style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-subtle)',
+                  }}
+                >
+                  <TrendingUp size={18} className="text-[var(--orange-400)]" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Contar rendimientos como ingreso</h3>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    Suma los rendimientos acreditados al total de ingresos en el Panorama y balance neto (excluidos de presupuestos).
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                role="switch"
+                aria-checked={Boolean(settings?.countInterestAsIncome)}
+                onClick={async () => {
+                  const nextVal = !settings?.countInterestAsIncome
+                  await setCountInterestAsIncome(nextVal)
+                  setSaveSuccessMsg(nextVal ? 'Rendimientos incluidos en ingresos.' : 'Rendimientos excluidos de ingresos.')
+                  setTimeout(() => setSaveSuccessMsg(''), 3000)
+                }}
+                className="flex items-center justify-center p-2 text-[var(--text-muted)] hover:text-white transition-colors"
+                style={{ minWidth: '44px', minHeight: '44px' }}
+                aria-label="Alternar inclusión de rendimientos como ingreso"
+              >
+                {settings?.countInterestAsIncome ? (
                   <ToggleRight size={28} className="text-[var(--orange-400)]" />
                 ) : (
                   <ToggleLeft size={28} className="text-[var(--text-muted)]" />
@@ -1843,30 +1909,55 @@ export default function SettingsPage() {
               {/* Limpiar cuentas para iniciar desde cero */}
               {accounts.length > 0 && (
                 <div
-                  className="p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t"
+                  className="p-3.5 rounded-xl flex flex-col gap-3 pt-3 border-t"
                   style={{ borderColor: 'var(--border-subtle)' }}
                 >
-                  <div>
-                    <span className="font-semibold text-xs text-[var(--red-400)] block">Limpiar tarjetas actuales</span>
-                    <p className="text-[11px] text-[var(--text-muted)]">
-                      Elimina las {accounts.length} tarjetas registradas para dejar la billetera vacía y agregarlas manualmente.
-                    </p>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <span className="font-semibold text-xs text-white block">Dejar solo cuenta de Efectivo</span>
+                      <p className="text-[11px] text-[var(--text-muted)]">
+                        Elimina las tarjetas demo registradas ({accounts.filter(a => a.type !== 'cash').length}) y conserva únicamente tu cuenta de Efectivo.
+                      </p>
+                    </div>
+
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={async () => {
+                        if (window.confirm('¿Deseas eliminar las tarjetas demo y dejar únicamente la cuenta de Efectivo?')) {
+                          await resetToCashOnly()
+                          setSaveSuccessMsg('Se restableció la billetera dejando únicamente Efectivo.')
+                          setTimeout(() => setSaveSuccessMsg(''), 3000)
+                        }
+                      }}
+                    >
+                      Dejar solo Efectivo
+                    </Button>
                   </div>
 
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    icon={Trash2}
-                    onClick={async () => {
-                      if (window.confirm('¿Seguro que deseas eliminar todas las tarjetas registradas? La billetera quedará en blanco para que las agregues manualmente.')) {
-                        await clearAllAccounts()
-                        setSaveSuccessMsg('Todas las tarjetas han sido eliminadas. Billetera vacía.')
-                        setTimeout(() => setSaveSuccessMsg(''), 3000)
-                      }
-                    }}
-                  >
-                    Eliminar todas las tarjetas
-                  </Button>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-[var(--border-subtle)]">
+                    <div>
+                      <span className="font-semibold text-xs text-[var(--red-400)] block">Limpiar todas las cuentas</span>
+                      <p className="text-[11px] text-[var(--text-muted)]">
+                        Elimina las {accounts.length} cuentas registradas para dejar la billetera completamente vacía.
+                      </p>
+                    </div>
+
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      icon={Trash2}
+                      onClick={async () => {
+                        if (window.confirm('¿Seguro que deseas eliminar todas las tarjetas registradas? La billetera quedará en blanco para que las agregues manualmente.')) {
+                          await clearAllAccounts()
+                          setSaveSuccessMsg('Todas las tarjetas han sido eliminadas. Billetera vacía.')
+                          setTimeout(() => setSaveSuccessMsg(''), 3000)
+                        }
+                      }}
+                    >
+                      Eliminar todas
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -2091,7 +2182,7 @@ export default function SettingsPage() {
                       </span>
                     </div>
                     <p className="text-xs text-[var(--text-secondary)] mt-0.5 leading-relaxed">
-                      Agrega el botón <strong>"Registrar gasto"</strong> a la cortina superior de tu celular para registrar compras en un solo toque desde cualquier app.
+                      Agrega el botón <strong>&quot;Registrar gasto&quot;</strong> a la cortina superior de tu celular para registrar compras en un solo toque desde cualquier app.
                     </p>
                   </div>
                 </div>
@@ -2148,7 +2239,7 @@ export default function SettingsPage() {
                     <ol className="list-decimal list-inside space-y-1.5 text-white/90">
                       <li>Desliza la barra de notificaciones hacia abajo dos veces para desplegar todos los ajustes rápidos.</li>
                       <li>Toca el ícono del <strong>lápiz (Editar)</strong> o los tres puntos en la esquina superior.</li>
-                      <li>En la sección de mosaicos disponibles abajo, busca el ícono de <strong>Finanzas: "Registrar gasto"</strong>.</li>
+                      <li>En la sección de mosaicos disponibles abajo, busca el ícono de <strong>Finanzas: &quot;Registrar gasto&quot;</strong>.</li>
                       <li>Mantén presionado y arrástralo hacia arriba entre tus ajustes activos.</li>
                     </ol>
                   </div>
@@ -2166,7 +2257,7 @@ export default function SettingsPage() {
                 <Smartphone size={16} className="text-[var(--orange-400)] flex-shrink-0 mt-0.5" />
                 <div className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
                   <strong className="text-white block font-medium mb-0.5">Atajos al mantener presionado el ícono:</strong>
-                  Mantén pulsado el ícono de Finanzas en tu pantalla de inicio para acceder directamente a <strong>"Registrar gasto"</strong>, <strong>"Registrar ingreso"</strong> o <strong>"Ver Panorama"</strong>.
+                  Mantén pulsado el ícono de Finanzas en tu pantalla de inicio para acceder directamente a <strong>&quot;Registrar gasto&quot;</strong>, <strong>&quot;Registrar ingreso&quot;</strong> o <strong>&quot;Ver Panorama&quot;</strong>.
                 </div>
               </div>
             </div>
@@ -2486,6 +2577,13 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ── SECCIÓN: DETECCIÓN DE MOVIMIENTOS ── */}
+        {activeTab === 'detection' && (
+          <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+            <NotificationDetectionSection />
           </div>
         )}
       </main>

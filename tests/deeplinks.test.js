@@ -47,6 +47,12 @@ describe('Domain: Deeplinks parser (finanzas://)', () => {
     expect(res.route).toBe('/ajustes')
   })
 
+  it('parses finanzas://confirmar into /ajustes (pending detections review)', () => {
+    const res = parseDeepLink('finanzas://confirmar')
+    expect(res.isValid).toBe(true)
+    expect(res.route).toBe('/ajustes')
+  })
+
   it('handles shortcuts with extra slashes finanzas:///registrar?type=expense', () => {
     const res = parseDeepLink('finanzas:///registrar?type=expense')
     expect(res.isValid).toBe(true)

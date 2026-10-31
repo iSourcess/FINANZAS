@@ -152,6 +152,7 @@ export function calculateHistoricalInterest({
   movements = [],
   buckets = [],
   referenceDate = new Date(),
+  interestAccruals = null,
 }) {
   const todayStr = toLocalDateStr(referenceDate)
   const yieldAccounts = accounts.filter(isYieldAccount)
@@ -175,14 +176,24 @@ export function calculateHistoricalInterest({
     }
   }
 
-  // Precalcula movimientos filtrados que afectan a las cuentas de rendimiento
+  // Mapa para consulta rápida de acreditaciones reales registradas
+  const accrualsMap = interestAccruals ? new Map() : null
+  if (Array.isArray(interestAccruals)) {
+    for (const a of interestAccruals) {
+      accrualsMap.set(`${a.accountId}_${a.date}`, a.amountCents || 0)
+    }
+  }
+
+  // Precalcula movimientos filtrados (solo necesarios si no se cuenta con interestAccruals)
   const yieldAccountIds = new Set(yieldAccounts.map((a) => a.id))
-  const relevantMovements = movements.filter(
-    (m) =>
-      yieldAccountIds.has(m.accountId) ||
-      yieldAccountIds.has(m.sourceAccountId) ||
-      yieldAccountIds.has(m.destinationAccountId)
-  )
+  const relevantMovements = accrualsMap
+    ? []
+    : movements.filter(
+        (m) =>
+          yieldAccountIds.has(m.accountId) ||
+          yieldAccountIds.has(m.sourceAccountId) ||
+          yieldAccountIds.has(m.destinationAccountId)
+      )
 
   let globalPastCents = 0
   let globalProjectedCents = 0
@@ -241,8 +252,13 @@ export function calculateHistoricalInterest({
           dailyInt = calculateAccountDailyInterest(acc, bal)
           bucketProjectedCents += dailyInt
           bucketByAccount[acc.id].projectedCents += dailyInt
+        } else if (accrualsMap) {
+          // Pasado: lee directamente las acreditaciones reales de interestAccruals (sin reconstruir saldos)
+          dailyInt = accrualsMap.get(`${acc.id}_${dStr}`) || 0
+          bucketPastCents += dailyInt
+          bucketByAccount[acc.id].pastCents += dailyInt
         } else {
-          // Pasado: reconstruir saldo exacto
+          // Pasado sin registros: reconstruir saldo histórico como fallback
           const histBalance = reconstructHistoricalBalance(acc, relevantMovements, dStr)
           dailyInt = calculateAccountDailyInterest(acc, histBalance)
           bucketPastCents += dailyInt

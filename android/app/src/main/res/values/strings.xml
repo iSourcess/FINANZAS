@@ -18,4 +18,6 @@
     <string name="widget_tap_to_register">Toca para registrar</string>
     <string name="widget_btn_expense">+ Gasto</string>
     <string name="widget_btn_income">+ Ingreso</string>
+    <string name="notification_listener_service_name">Lector de alertas bancarias</string>
+    <string name="notification_listener_service_description">Detecta notificaciones de transacciones de tus bancos seleccionados para registrar movimientos.</string>
 </resources>

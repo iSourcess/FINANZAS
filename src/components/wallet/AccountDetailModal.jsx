@@ -6,7 +6,7 @@
  * Incluye botones "Subir" / "Bajar" como alternativa sin gestos al reordenamiento.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Edit2,
   Trash2,
@@ -25,12 +25,14 @@ import Button from '../ui/Button.jsx'
 import Toast from '../ui/Toast.jsx'
 import WalletCard from './WalletCard.jsx'
 import YieldPanel from './YieldPanel.jsx'
+import AccrualPanel from './AccrualPanel.jsx'
 import CreditCardPanel from './CreditCardPanel.jsx'
 import ReconcileModal from './ReconcileModal.jsx'
 import { useMovements } from '../../store/useMovements.js'
 import { useAccounts } from '../../store/useAccounts.js'
 import { formatDaysSinceReconcile } from '../../domain/reconcile.js'
 import { formatMoney, formatPercent } from '../../lib/format.js'
+import { db } from '../../db/database.js'
 
 export default function AccountDetailModal({
   account,
@@ -48,6 +50,19 @@ export default function AccountDetailModal({
   const [isReconcileOpen, setIsReconcileOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
   const [toastUndoId, setToastUndoId] = useState(null)
+  const [lastAccrualDate, setLastAccrualDate] = useState(null)
+
+  // Cargar el último día acreditado para esta cuenta
+  useEffect(() => {
+    if (!account?.id) return
+    db.interestAccruals
+      .where('accountId')
+      .equals(account.id)
+      .reverse()
+      .sortBy('date')
+      .then((rows) => setLastAccrualDate(rows[0]?.date || null))
+      .catch(() => setLastAccrualDate(null))
+  }, [account?.id])
 
   if (!account) return null
 
@@ -360,6 +375,27 @@ export default function AccountDetailModal({
                 )
               })()}
             </div>
+          )}
+
+          {/* ── Panel de Acreditación de Rendimientos ── */}
+          {isDebitOrSavings && account.yieldTiers && account.yieldTiers.length > 0 && (
+            <AccrualPanel
+              account={account}
+              lastAccrualDate={lastAccrualDate}
+              onToggleEnabled={async (enabled) => {
+                const today = new Date()
+                const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+                await updateAccount(account.id, {
+                  interestEnabled: enabled,
+                  interestStartDate: enabled
+                    ? (account.interestEnabled ? (account.interestStartDate || todayISO) : todayISO)
+                    : account.interestStartDate,
+                })
+              }}
+              onChangeStartDate={async (date) => {
+                await updateAccount(account.id, { interestStartDate: date })
+              }}
+            />
           )}
 
           {/* ── Panel de Rendimiento Estimado (Débito / Ahorro) ── */}

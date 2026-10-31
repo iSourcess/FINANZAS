@@ -41,28 +41,35 @@ import {
   AlertTriangle,
   Clock,
   Link2,
+  Sparkles,
 } from 'lucide-react'
 import { useMovements } from '../../store/useMovements.js'
 import { useAccounts } from '../../store/useAccounts.js'
 import { useBudgets } from '../../store/useBudgets.js'
 import { useGoals } from '../../store/useGoals.js'
 import { useRecurringIncomes } from '../../store/useRecurringIncomes.js'
+import { useSettings } from '../../store/useSettings.js'
 import PeriodFilter from '../../components/layout/PeriodFilter.jsx'
 import DonutChart from '../../components/charts/DonutChart.jsx'
 import TrendChart from '../../components/charts/TrendChart.jsx'
 import InterestChart from '../../components/charts/InterestChart.jsx'
+import InterestHistory from '../../components/charts/InterestHistory.jsx'
 import InvestmentsChart from '../../components/charts/InvestmentsChart.jsx'
 import BudgetBar from '../../components/charts/BudgetBar.jsx'
 import SavingsGoalsSection from '../../components/goals/SavingsGoalsSection.jsx'
 import Button from '../../components/ui/Button.jsx'
 import FxWidget from '../../components/fx/FxWidget.jsx'
 import ConfirmIncomeOccurrenceModal from '../../components/forms/ConfirmIncomeOccurrenceModal.jsx'
+import PendingDetectionsCard from '../../components/notifications/PendingDetectionsCard.jsx'
+import ReviewDetectionsModal from '../../components/notifications/ReviewDetectionsModal.jsx'
+import Toast from '../../components/ui/Toast.jsx'
 import { getPeriodRange, getPreviousPeriodRange, isDateInRange, toISODate } from '../../domain/periods.js'
 import { calculatePeriodSummaries } from '../../domain/summaries.js'
 import { calculateBudgetsSummary } from '../../domain/budgets.js'
 import { findMatchingManualIncome } from '../../domain/recurringIncome.js'
 import { formatMoney, formatDate, accountLabel } from '../../lib/format.js'
 import { getCardTheme } from '../../lib/constants.js'
+import { fetchTotalAccruedInRange } from '../../services/interestAccrual.js'
 
 const ICON_MAP = {
   UtensilsCrossed,
@@ -93,8 +100,16 @@ export default function OverviewPage() {
     markSkipped,
     linkManualMovement,
   } = useRecurringIncomes()
+  const { settings } = useSettings()
+
+  // Total de rendimientos acreditados en el periodo
+  const [accrualsTotalCents, setAccrualsTotalCents] = useState(0)
 
   const [confirmingOccurrence, setConfirmingOccurrence] = useState(null)
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
+  const [toastMessage, setToastMessage] = useState('')
+  const [toastAction, setToastAction] = useState(null)
+  const [toastUndo, setToastUndo] = useState(null)
   const todayStr = toISODate(new Date())
 
   // Estado del filtro de periodo
@@ -133,6 +148,21 @@ export default function OverviewPage() {
     return { currentRange: curr, prevRange: prev }
   }, [periodType, customRange])
 
+  // Cargar rendimientos acreditados del periodo actual
+  useEffect(() => {
+    let isMounted = true
+    fetchTotalAccruedInRange(currentRange.startDate, currentRange.endDate)
+      .then((total) => {
+        if (isMounted) setAccrualsTotalCents(total || 0)
+      })
+      .catch(() => {
+        if (isMounted) setAccrualsTotalCents(0)
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [currentRange.startDate, currentRange.endDate])
+
   // Calcular resúmenes del periodo
   const summary = useMemo(() => {
     return calculatePeriodSummaries({
@@ -142,8 +172,17 @@ export default function OverviewPage() {
       endDate: currentRange.endDate,
       prevStartDate: prevRange?.startDate,
       prevEndDate: prevRange?.endDate,
+      accrualsTotalCents,
+      countInterestAsIncome: Boolean(settings?.countInterestAsIncome),
     })
-  }, [movements, categories, currentRange, prevRange])
+  }, [
+    movements,
+    categories,
+    currentRange,
+    prevRange,
+    accrualsTotalCents,
+    settings?.countInterestAsIncome,
+  ])
 
   // Resumen de presupuestos de este mes
   const budgetsSummary = useMemo(() => {
@@ -185,6 +224,9 @@ export default function OverviewPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto flex flex-col gap-6">
+      {/* ── Tarjeta "Por confirmar (N)" ── */}
+      <PendingDetectionsCard onOpenReview={() => setIsReviewModalOpen(true)} />
+
       {/* ── Widget de Tipo de Cambio (USD/MXN, EUR/MXN) ── */}
       <FxWidget />
 
@@ -245,6 +287,29 @@ export default function OverviewPage() {
             >
               {formatMoney(summary.totalIncome)}
             </span>
+
+            {/* Rendimientos como línea aparte de los ingresos */}
+            <div
+              className="flex items-center justify-between text-xs mt-2.5 pt-2 border-t"
+              style={{ borderColor: 'var(--border-subtle)' }}
+            >
+              <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
+                <Sparkles size={13} className="text-[var(--orange-400)]" />
+                <span>Rendimientos</span>
+              </div>
+              <span
+                className="font-mono font-semibold text-[var(--orange-400)]"
+                style={{ fontVariantNumeric: 'tabular-nums' }}
+              >
+                +{formatMoney(accrualsTotalCents)}
+              </span>
+            </div>
+
+            {settings?.countInterestAsIncome ? (
+              <span className="text-[10px] text-[var(--text-muted)] mt-1 block">
+                (incluidos en el total de ingresos)
+              </span>
+            ) : null}
 
             {summary.comparison.income && (
               <span className="text-[11px] text-[var(--text-secondary)] mt-1 block">
@@ -902,17 +967,28 @@ export default function OverviewPage() {
           </select>
         </div>
 
+        {/* Línea mensual de rendimientos por cuenta (desplegable) */}
+        <InterestHistory
+          startDate={currentRange.startDate}
+          endDate={currentRange.endDate}
+          accounts={accounts}
+          typeFilter={typeFilter}
+          searchTerm={searchTerm}
+        />
+
         {/* Lista de Movimientos */}
         {filteredHistory.length === 0 ? (
-          <div
-            className="rounded-2xl p-6 text-center text-xs text-[var(--text-muted)]"
-            style={{
-              background: 'var(--bg-surface)',
-              border: '1px dashed var(--border-default)',
-            }}
-          >
-            No se encontraron movimientos que coincidan con los filtros.
-          </div>
+          accrualsTotalCents === 0 ? (
+            <div
+              className="rounded-2xl p-6 text-center text-xs text-[var(--text-muted)]"
+              style={{
+                background: 'var(--bg-surface)',
+                border: '1px dashed var(--border-default)',
+              }}
+            >
+              No se encontraron movimientos que coincidan con los filtros.
+            </div>
+          ) : null
         ) : (
           <div className="flex flex-col gap-2">
             {filteredHistory.map((movement) => {
@@ -1005,6 +1081,31 @@ export default function OverviewPage() {
           await fetchMovements()
         }}
       />
+
+      {/* ── Modal de Revisión de Movimientos Detectados ── */}
+      <ReviewDetectionsModal
+        isOpen={isReviewModalOpen}
+        onClose={() => setIsReviewModalOpen(false)}
+        onToast={(msg, actionLabel, onAction) => {
+          setToastMessage(msg)
+          setToastAction(actionLabel)
+          setToastUndo(() => onAction)
+        }}
+      />
+
+      {/* ── Toast de confirmación y deshacer ── */}
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          action={toastAction}
+          onUndo={toastUndo}
+          onClose={() => {
+            setToastMessage('')
+            setToastAction(null)
+            setToastUndo(null)
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -4,14 +4,13 @@
  * Gráfica lineal de Intereses ganados en el periodo seleccionado.
  *
  * Características:
- *   - Gráfica lineal (LineChart) que obedece estrictamente al PeriodFilter.
- *   - Muestra el rendimiento diario / por cubeta generado en cuentas con tasa activa.
+ *   - Pasado: lee interestAccruals (acreditaciones reales al saldo) por cubeta.
+ *   - Futuro: usa proyección con saldo actual (calculateHistoricalInterest).
  *   - Total acumulado en pesos del periodo.
- *   - Tooltip interactivo con desglose por cuenta al posar el cursor o tocar un punto.
- *   - Sin proyecciones futuras (solo histórico real del periodo).
+ *   - Tooltip interactivo con desglose por cuenta.
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   LineChart,
   Line,
@@ -28,6 +27,7 @@ import {
 } from '../../domain/interest.js'
 import { formatMoney } from '../../lib/format.js'
 import { getCardTheme } from '../../lib/constants.js'
+import { db } from '../../db/database.js'
 
 export default function InterestChart({
   accounts = [],
@@ -42,31 +42,63 @@ export default function InterestChart({
     return accounts.filter(isYieldAccount)
   }, [accounts])
 
-  // Cubetas según el periodo seleccionado (Semana, Mes, Año, Todo, Rango)
+  const todayStr = useMemo(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }, [])
+
+  // Cubetas según el periodo seleccionado
   const buckets = useMemo(() => {
     return getBuckets(period, referenceDate)
   }, [period, referenceDate])
 
-  // Cálculo histórico de intereses para el periodo
+  // Accruals reales de la DB (para cubetas pasadas)
+  const [realAccruals, setRealAccruals] = useState([])
+  useEffect(() => {
+    if (buckets.length === 0) return
+    const from = buckets[0].start
+    const to = buckets[buckets.length - 1].end
+    db.interestAccruals
+      .where('date')
+      .between(from, to, true, true)
+      .toArray()
+      .then(setRealAccruals)
+      .catch(() => setRealAccruals([]))
+  }, [buckets])
+
+  // Cálculo: lee interestAccruals para el pasado (sin reconstruir saldos) y usa proyección para el futuro
   const historicalData = useMemo(() => {
     return calculateHistoricalInterest({
       accounts: yieldAccounts,
       movements,
       buckets,
       referenceDate,
+      interestAccruals: realAccruals,
     })
-  }, [yieldAccounts, movements, buckets, referenceDate])
+  }, [yieldAccounts, movements, buckets, referenceDate, realAccruals])
 
-  // Datos para la gráfica lineal
+  // Datos para la gráfica: real para pasado, proyección para futuro
   const chartData = useMemo(() => {
-    return historicalData.bucketSeries.map((b, idx) => ({
-      key: `bucket-${idx}`,
-      label: b.label,
-      total: b.totalInterestCents / 100, // en pesos para eje Y
-      totalCents: b.totalInterestCents,
-      byAccount: b.byAccount,
-    }))
-  }, [historicalData])
+    return historicalData.bucketSeries.map((b, idx) => {
+      const isPast = b.end < todayStr
+      const totalCents = b.totalInterestCents
+
+      return {
+        key: `bucket-${idx}`,
+        label: b.label,
+        total: totalCents / 100,
+        totalCents,
+        isFuture: !isPast,
+        byAccount: b.byAccount,
+      }
+    })
+  }, [historicalData, todayStr])
+
+  const totalCents = useMemo(
+    () => chartData.reduce((sum, d) => sum + d.totalCents, 0),
+    [chartData]
+  )
+  const hasAnyInterest = chartData.some((d) => d.totalCents > 0)
 
   // Estado vacío si no hay cuentas de rendimiento
   if (yieldAccounts.length === 0) {
@@ -99,9 +131,6 @@ export default function InterestChart({
       </div>
     )
   }
-
-  const totalCents = historicalData.totalPeriodInterestCents
-  const hasAnyInterest = chartData.some((d) => d.totalCents > 0)
 
   return (
     <div

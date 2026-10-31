@@ -448,8 +448,148 @@ db.version(10)
     }
   })
 
+db.version(11)
+  .stores({
+    /**
+     * Versión 11:
+     * - interestAccruals: registro diario de intereses acreditados al saldo.
+     *     Clave única compuesta [accountId+date] garantiza idempotencia.
+     *     Campos: id, accountId, date ('YYYY-MM-DD'), amountCents, baseCents, rate, carryCents.
+     * - accounts: agrega interestEnabled (boolean) e interestStartDate ('YYYY-MM-DD').
+     */
+    accounts: '++id, type, currency, parentId, sortOrder, lastReconciledAt',
+    movements: '++id, accountId, toAccountId, categoryId, date, type, reason, debtId, importBatchId',
+    categories: '++id, type',
+    budgets: '++id, categoryId',
+    fixedExpenses: '++id, categoryId, accountId',
+    holdings: '++id, symbol, kind',
+    lots: '++id, holdingId, symbol, date',
+    priceCache: 'symbol',
+    priceHistory: '++id, [symbol+date], symbol, date',
+    settings: 'id',
+    fxHistory: '++id, [pair+date], pair, date',
+    goals: '++id, name, targetDate, status, createdAt',
+    goalContributions: '++id, goalId, accountId, date, createdAt',
+    templates: '++id, sortOrder, useCount, type, categoryId, accountId',
+    recurringIncomes: '++id, frequency, categoryId, accountId, active, startDate',
+    recurringIncomeOccurrences: '++id, [recurringId+dueDate], recurringId, dueDate, status',
+    debts: '++id, direction, person, status, openedAt, dueDate',
+    debtPayments: '++id, debtId, date, accountId, adjustmentId',
+    importProfiles: '++id, accountId, name, updatedAt',
+    categoryRules: '++id, keyword, categoryId, hitCount, createdAt',
+    importBatches: '++id, accountId, date, fileName, status, createdAt',
+    interestAccruals: '++id, [accountId+date], accountId, date',
+  })
+  .upgrade(async (tx) => {
+    // Migración v10 -> v11: inicializar interestEnabled e interestStartDate en cuentas existentes.
+    // No se habilita automáticamente: el usuario lo activa por cuenta.
+    const today = new Date()
+    const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    const accounts = await tx.table('accounts').toArray()
+    for (const acc of accounts) {
+      const updates = {}
+      if (acc.interestEnabled === undefined) updates.interestEnabled = false
+      if (acc.interestStartDate === undefined) updates.interestStartDate = todayISO
+      if (Object.keys(updates).length > 0) {
+        await tx.table('accounts').update(acc.id, updates)
+      }
+    }
+  })
+
+db.version(12)
+  .stores({
+    /**
+     * Versión 12:
+     * - rawSamples: Muestras de notificaciones bancarias capturadas en modo captura.
+     *   Almacena el texto íntegro para posterior desarrollo de parsers de bancos.
+     *   Expiración automática de 7 días.
+     *   NO entra en los respaldos.
+     */
+    accounts: '++id, type, currency, parentId, sortOrder, lastReconciledAt',
+    movements: '++id, accountId, toAccountId, categoryId, date, type, reason, debtId, importBatchId',
+    categories: '++id, type',
+    budgets: '++id, categoryId',
+    fixedExpenses: '++id, categoryId, accountId',
+    holdings: '++id, symbol, kind',
+    lots: '++id, holdingId, symbol, date',
+    priceCache: 'symbol',
+    priceHistory: '++id, [symbol+date], symbol, date',
+    settings: 'id',
+    fxHistory: '++id, [pair+date], pair, date',
+    goals: '++id, name, targetDate, status, createdAt',
+    goalContributions: '++id, goalId, accountId, date, createdAt',
+    templates: '++id, sortOrder, useCount, type, categoryId, accountId',
+    recurringIncomes: '++id, frequency, categoryId, accountId, active, startDate',
+    recurringIncomeOccurrences: '++id, [recurringId+dueDate], recurringId, dueDate, status',
+    debts: '++id, direction, person, status, openedAt, dueDate',
+    debtPayments: '++id, debtId, date, accountId, adjustmentId',
+    importProfiles: '++id, accountId, name, updatedAt',
+    categoryRules: '++id, keyword, categoryId, hitCount, createdAt',
+    importBatches: '++id, accountId, date, fileName, status, createdAt',
+    interestAccruals: '++id, [accountId+date], accountId, date',
+    rawSamples: '++id, packageName, postTime, createdAt',
+  })
+  .upgrade(async (tx) => {
+    // Migración v11 -> v12: inicializar ajustes de detección de notificaciones si existen en settings
+    const settings = await tx.table('settings').get('global')
+    if (settings) {
+      const updates = {}
+      if (settings.notificationDetectionEnabled === undefined) updates.notificationDetectionEnabled = false
+      if (settings.captureModeEnabled === undefined) updates.captureModeEnabled = false
+      if (settings.bankAccountMappings === undefined) updates.bankAccountMappings = {}
+      if (Object.keys(updates).length > 0) {
+        await tx.table('settings').update('global', updates)
+      }
+    }
+  })
+
+db.version(13)
+  .stores({
+    /**
+     * Versión 13:
+     * - detectionRules: Reglas declarativas de parseo como datos por app y cuenta.
+     * - pendingDetections: Movimientos bancarios detectados pendientes de confirmar por el usuario.
+     *   (Sin almacenar el texto original íntegro por privacidad).
+     */
+    accounts: '++id, type, currency, parentId, sortOrder, lastReconciledAt',
+    movements: '++id, accountId, toAccountId, categoryId, date, type, reason, debtId, importBatchId',
+    categories: '++id, type',
+    budgets: '++id, categoryId',
+    fixedExpenses: '++id, categoryId, accountId',
+    holdings: '++id, symbol, kind',
+    lots: '++id, holdingId, symbol, date',
+    priceCache: 'symbol',
+    priceHistory: '++id, [symbol+date], symbol, date',
+    settings: 'id',
+    fxHistory: '++id, [pair+date], pair, date',
+    goals: '++id, name, targetDate, status, createdAt',
+    goalContributions: '++id, goalId, accountId, date, createdAt',
+    templates: '++id, sortOrder, useCount, type, categoryId, accountId',
+    recurringIncomes: '++id, frequency, categoryId, accountId, active, startDate',
+    recurringIncomeOccurrences: '++id, [recurringId+dueDate], recurringId, dueDate, status',
+    debts: '++id, direction, person, status, openedAt, dueDate',
+    debtPayments: '++id, debtId, date, accountId, adjustmentId',
+    importProfiles: '++id, accountId, name, updatedAt',
+    categoryRules: '++id, keyword, categoryId, hitCount, createdAt',
+    importBatches: '++id, accountId, date, fileName, status, createdAt',
+    interestAccruals: '++id, [accountId+date], accountId, date',
+    rawSamples: '++id, packageName, postTime, createdAt',
+    detectionRules: '++id, packageName, accountId, enabled, priority',
+    pendingDetections: '++id, packageName, postedAt, detectedAt, status, accountId, duplicateOf',
+  })
+  .upgrade(async (tx) => {
+    // Migración v12 -> v13: asegurar opciones de notificación en settings
+    const settings = await tx.table('settings').get('global')
+    if (settings) {
+      const updates = {}
+      if (settings.showAmountInNotification === undefined) updates.showAmountInNotification = true
+      if (settings.genericExpensePattern === undefined) updates.genericExpensePattern = ''
+      if (settings.genericIncomePattern === undefined) updates.genericIncomePattern = ''
+      if (settings.genericIgnorePatterns === undefined) updates.genericIgnorePatterns = []
+      if (Object.keys(updates).length > 0) {
+        await tx.table('settings').update('global', updates)
+      }
+    }
+  })
+
 export default db
-
-
-
-

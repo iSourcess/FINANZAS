@@ -166,6 +166,44 @@ describe('Domain: Historical Interest and Projection', () => {
       // Total daily: 908 cents
       expect(res.totalPeriodInterestCents).toBe(908)
     })
+
+    it('reads interestAccruals directly for past dates instead of reconstructing balances', () => {
+      const account = {
+        id: 'acc-revolut',
+        name: 'Revolut',
+        type: 'debit',
+        themeKey: 'revolut',
+        balance: 1_000_000,
+        yieldTiers: [{ upTo: null, rate: 0.15 }],
+        createdAt: '2026-01-01T00:00:00.000Z',
+      }
+
+      const buckets = [
+        { start: '2026-10-01', end: '2026-10-01', label: '01' },
+        { start: '2026-10-02', end: '2026-10-02', label: '02' },
+      ]
+
+      // Simular acreditaciones reales registradas previamente
+      const interestAccruals = [
+        { accountId: 'acc-revolut', date: '2026-10-01', amountCents: 410 },
+        { accountId: 'acc-revolut', date: '2026-10-02', amountCents: 411 },
+      ]
+
+      const refDate = new Date(2026, 9, 10) // 10 de octubre (ambos días en el pasado)
+
+      const res = calculateHistoricalInterest({
+        accounts: [account],
+        movements: [], // No se necesita reconstruir saldos desde movimientos
+        buckets,
+        referenceDate: refDate,
+        interestAccruals,
+      })
+
+      // Debe tomar exactamente los 410 + 411 = 821 centavos de interestAccruals
+      expect(res.totalPeriodInterestCents).toBe(821)
+      expect(res.bucketSeries[0].pastInterestCents).toBe(410)
+      expect(res.bucketSeries[1].pastInterestCents).toBe(411)
+    })
   })
 
   describe('projectInterest', () => {

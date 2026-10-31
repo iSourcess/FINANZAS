@@ -39,6 +39,8 @@ import MovementForm from '../../components/forms/MovementForm.jsx'
 import TemplateChipsRow from '../../components/forms/TemplateChipsRow.jsx'
 import TemplateFormModal from '../../components/forms/TemplateFormModal.jsx'
 import ReconcileModal from '../../components/wallet/ReconcileModal.jsx'
+import PendingDetectionsCard from '../../components/notifications/PendingDetectionsCard.jsx'
+import ReviewDetectionsModal from '../../components/notifications/ReviewDetectionsModal.jsx'
 import Toast from '../../components/ui/Toast.jsx'
 import Modal from '../../components/ui/Modal.jsx'
 import { applyTemplate } from '../../domain/templates.js'
@@ -93,6 +95,9 @@ export default function RegisterPage() {
   // Modales de plantillas
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
   const [templateToEdit, setTemplateToEdit] = useState(null)
+
+  // Modal de revisión de movimientos detectados
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
 
   // Toast
   const [toastMessage, setToastMessage] = useState('')
@@ -269,6 +274,9 @@ export default function RegisterPage() {
 
   return (
     <div className="p-4 sm:p-6 pb-10 max-w-2xl mx-auto flex flex-col gap-6">
+      {/* ── Tarjeta "Por confirmar (N)" ── */}
+      <PendingDetectionsCard onOpenReview={() => setIsReviewModalOpen(true)} />
+
       {/* ── Encabezado ── */}
       <div>
         <h1
@@ -518,6 +526,17 @@ export default function RegisterPage() {
         template={templateToEdit}
         accounts={accounts}
         categories={categories}
+      />
+
+      {/* ── Modal de Revisión de Movimientos Detectados ── */}
+      <ReviewDetectionsModal
+        isOpen={isReviewModalOpen}
+        onClose={() => setIsReviewModalOpen(false)}
+        onToast={(msg, actionLabel, onAction) => {
+          setToastMessage(msg)
+          setToastAction(actionLabel)
+          setToastUndo(() => onAction)
+        }}
       />
 
       {/* ── Toast con soporte para Acción y Deshacer ── */}

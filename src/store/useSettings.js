@@ -25,6 +25,7 @@ export const useSettings = create((set, get) => ({
     finnhubApiKey: '',
     templateTapBehavior: 'fill', // 'fill' | 'instant'
     includeDebtsInNetWorth: false,
+    countInterestAsIncome: false,
     showAmountsOnWidget: false,
     reminders: { ...DEFAULT_REMINDER_SETTINGS },
   },
@@ -48,6 +49,7 @@ export const useSettings = create((set, get) => ({
           finnhubApiKey: '',
           templateTapBehavior: 'fill',
           includeDebtsInNetWorth: false,
+          countInterestAsIncome: false,
           showAmountsOnWidget: false,
           reminders: { ...DEFAULT_REMINDER_SETTINGS },
         }
@@ -61,6 +63,9 @@ export const useSettings = create((set, get) => ({
         if (!current.templateTapBehavior) current.templateTapBehavior = 'fill'
         if (typeof current.includeDebtsInNetWorth !== 'boolean') {
           current.includeDebtsInNetWorth = false
+        }
+        if (typeof current.countInterestAsIncome !== 'boolean') {
+          current.countInterestAsIncome = false
         }
         if (typeof current.showAmountsOnWidget !== 'boolean') {
           current.showAmountsOnWidget = false
@@ -121,6 +126,10 @@ export const useSettings = create((set, get) => ({
 
   setIncludeDebtsInNetWorth: async (enabled) => {
     return get().updateSettings({ includeDebtsInNetWorth: Boolean(enabled) })
+  },
+
+  setCountInterestAsIncome: async (enabled) => {
+    return get().updateSettings({ countInterestAsIncome: Boolean(enabled) })
   },
 
   setShowAmountsOnWidget: async (enabled) => {

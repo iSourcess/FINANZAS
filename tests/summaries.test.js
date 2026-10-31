@@ -110,5 +110,45 @@ describe('Domain: summaries calculations', () => {
     expect(summary.comparison.expense.percent).toBe(0)
     expect(summary.comparison.expense.diff).toBe(500000)
   })
+
+  it('excluye rendimientos de totalIncome y balance cuando countInterestAsIncome es false', () => {
+    const summary = calculatePeriodSummaries({
+      movements: [
+        { id: 'm1', type: 'income', amount: 100000, currency: 'MXN', date: '2026-10-01' },
+        { id: 'm2', type: 'expense', amount: 40000, currency: 'MXN', date: '2026-10-02' },
+      ],
+      categories,
+      startDate: '2026-10-01',
+      endDate: '2026-10-31',
+      accrualsTotalCents: 5000, // $50 de rendimientos
+      countInterestAsIncome: false,
+    })
+
+    expect(summary.totalIncome).toBe(100000)
+    expect(summary.movementIncome).toBe(100000)
+    expect(summary.accrualsTotalCents).toBe(5000)
+    expect(summary.countInterestAsIncome).toBe(false)
+    expect(summary.balance).toBe(60000) // 100,000 - 40,000
+  })
+
+  it('incluye rendimientos en totalIncome y balance cuando countInterestAsIncome es true', () => {
+    const summary = calculatePeriodSummaries({
+      movements: [
+        { id: 'm1', type: 'income', amount: 100000, currency: 'MXN', date: '2026-10-01' },
+        { id: 'm2', type: 'expense', amount: 40000, currency: 'MXN', date: '2026-10-02' },
+      ],
+      categories,
+      startDate: '2026-10-01',
+      endDate: '2026-10-31',
+      accrualsTotalCents: 5000,
+      countInterestAsIncome: true,
+    })
+
+    expect(summary.totalIncome).toBe(105000) // 100,000 + 5,000
+    expect(summary.movementIncome).toBe(100000)
+    expect(summary.accrualsTotalCents).toBe(5000)
+    expect(summary.countInterestAsIncome).toBe(true)
+    expect(summary.balance).toBe(65000) // 105,000 - 40,000
+  })
 })
 

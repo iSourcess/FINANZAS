@@ -206,6 +206,7 @@ export async function rescheduleAll(customState = null) {
         todayMovements,
         monthMovements,
         dbSettings,
+        pendingDetections,
       ] = await Promise.all([
         db.accounts.toArray().catch(() => []),
         db.fixedExpenses.toArray().catch(() => []),
@@ -215,6 +216,7 @@ export async function rescheduleAll(customState = null) {
         db.movements.where('date').equals(todayStr).toArray().catch(() => []),
         db.movements.where('date').between(`${currentMonthPrefix}-01`, `${currentMonthPrefix}-31`, true, true).toArray().catch(() => []),
         db.settings.get('global').catch(() => null),
+        db.pendingDetections ? db.pendingDetections.where('status').equals('pending').toArray().catch(() => []) : [],
       ])
 
       // Identificar gastos fijos ya pagados en el mes actual
@@ -233,6 +235,7 @@ export async function rescheduleAll(customState = null) {
         movementsToday: todayMovements,
         hasMovementToday: todayMovements.length > 0,
         lastBackupAt: settings.lastBackupAt || null,
+        pendingDetections: pendingDetections || [],
         settings,
       }
     }
