@@ -39,6 +39,8 @@ import {
   CheckCircle2,
   Clock,
   Sparkles,
+  ToggleLeft,
+  ToggleRight,
 } from 'lucide-react'
 import { useNotificationDetection } from '../../store/useNotificationDetection.js'
 import { useAccounts } from '../../store/useAccounts.js'
@@ -46,6 +48,7 @@ import NotificationListenerModal from '../../components/notifications/Notificati
 import NotificationSamplesModal from './NotificationSamplesModal.jsx'
 import RuleEditorModal from '../../components/notifications/RuleEditorModal.jsx'
 import { formatMoney } from '../../lib/format.js'
+import { openListenerSettings } from '../../services/notificationDetection.js'
 
 export default function NotificationDetectionSection() {
   const {
@@ -126,6 +129,11 @@ export default function NotificationDetectionSection() {
     }
   }
 
+  const handleRequestPermission = async () => {
+    setIsListenerModalOpen(true)
+    await openListenerSettings()
+  }
+
   return (
     <div
       className="p-4 sm:p-5 rounded-2xl flex flex-col gap-4 text-xs transition-colors"
@@ -155,101 +163,96 @@ export default function NotificationDetectionSection() {
           </div>
         </div>
 
-        {/* Switch general */}
+        {/* Switch general (estilo estándar Toggle) */}
         <button
           type="button"
           role="switch"
           aria-checked={isDetectionEnabled}
           onClick={() => toggleDetection()}
-          className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
-          style={{
-            background: isDetectionEnabled ? 'var(--orange-400)' : 'var(--bg-elevated)',
-            minHeight: '44px',
-            minWidth: '44px',
-            alignItems: 'center',
-          }}
+          className="flex items-center justify-center p-2 text-[var(--text-muted)] hover:text-white transition-colors flex-shrink-0"
+          style={{ minWidth: '44px', minHeight: '44px' }}
           aria-label="Activar detección de movimientos"
         >
-          <span
-            aria-hidden="true"
-            className="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out"
-            style={{
-              transform: isDetectionEnabled ? 'translateX(20px)' : 'translateX(0px)',
-            }}
-          />
+          {isDetectionEnabled ? (
+            <ToggleRight size={28} className="text-[var(--orange-400)]" />
+          ) : (
+            <ToggleLeft size={28} className="text-[var(--text-muted)]" />
+          )}
         </button>
       </div>
 
       {/* ── Estado visible del servicio ("Escuchando: sí / no") ── */}
       <div
-        className="p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+        className="p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3"
         style={{
           background: 'var(--bg-base)',
           border: '1px solid var(--border-subtle)',
         }}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-[var(--text-secondary)] font-medium">Estado del servicio:</span>
-          {isPermissionGranted && isConnected ? (
-            <span
-              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold text-[10px]"
-              style={{
-                background: 'var(--orange-900)',
-                color: 'var(--orange-300)',
-                border: '1px solid var(--orange-700)',
-              }}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--orange-400)] animate-pulse" />
-              Escuchando: sí
-            </span>
-          ) : isPermissionGranted && !isConnected ? (
-            <span
-              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold text-[10px]"
-              style={{
-                background: 'var(--red-900)',
-                color: 'var(--red-400)',
-                border: '1px solid var(--red-600)',
-              }}
-            >
-              <AlertTriangle size={11} />
-              Desconectado por el sistema
-            </span>
-          ) : (
-            <span
-              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-medium text-[10px]"
-              style={{
-                background: 'var(--bg-elevated)',
-                color: 'var(--text-muted)',
-                border: '1px solid var(--border-subtle)',
-              }}
-            >
-              <BellOff size={11} />
-              Escuchando: no (sin permiso)
-            </span>
-          )}
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <span className="text-[11px] text-[var(--text-secondary)] font-medium">Estado del servicio</span>
+          <div className="flex items-center gap-2">
+            {isPermissionGranted && isConnected ? (
+              <span
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold text-[10px]"
+                style={{
+                  background: 'var(--orange-900)',
+                  color: 'var(--orange-300)',
+                  border: '1px solid var(--orange-700)',
+                }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--orange-400)] animate-pulse" />
+                Escuchando: sí
+              </span>
+            ) : isPermissionGranted && !isConnected ? (
+              <span
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold text-[10px]"
+                style={{
+                  background: 'var(--red-900)',
+                  color: 'var(--red-400)',
+                  border: '1px solid var(--red-600)',
+                }}
+              >
+                <AlertTriangle size={11} />
+                Desconectado por el sistema
+              </span>
+            ) : (
+              <span
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-medium text-[10px]"
+                style={{
+                  background: 'var(--bg-elevated)',
+                  color: 'var(--text-muted)',
+                  border: '1px solid var(--border-subtle)',
+                }}
+              >
+                <BellOff size={11} />
+                Escuchando: no (sin permiso)
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Botones de acción del estado */}
-        <div className="flex items-center gap-2 self-end sm:self-auto">
+        <div className="flex items-center gap-2 self-start sm:self-auto">
           {!isPermissionGranted ? (
             <button
               type="button"
-              onClick={() => setIsListenerModalOpen(true)}
-              className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-[var(--text-inverse)] bg-[var(--orange-400)] hover:bg-[var(--orange-500)] transition-colors flex items-center gap-1"
-              style={{ minHeight: '36px' }}
+              onClick={handleRequestPermission}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-[var(--text-inverse)] bg-[var(--orange-400)] hover:bg-[var(--orange-500)] transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+              style={{ minHeight: '38px' }}
             >
               <span>Activar permiso</span>
-              <ExternalLink size={12} />
+              <ExternalLink size={13} />
             </button>
           ) : !isConnected ? (
             <button
               type="button"
               onClick={handleRebind}
               disabled={isRebinding}
-              className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-white bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:border-[var(--orange-400)] transition-colors flex items-center gap-1"
-              style={{ minHeight: '36px' }}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:border-[var(--orange-400)] transition-all flex items-center gap-1.5 active:scale-95"
+              style={{ minHeight: '38px' }}
             >
-              <RotateCcw size={12} className={isRebinding ? 'animate-spin' : ''} />
+              <RotateCcw size={13} className={isRebinding ? 'animate-spin' : ''} />
               <span>Reconectar</span>
             </button>
           ) : null}
@@ -257,8 +260,8 @@ export default function NotificationDetectionSection() {
           <button
             type="button"
             onClick={() => setIsListenerModalOpen(true)}
-            className="p-1.5 text-[var(--text-muted)] hover:text-white rounded-lg transition-colors"
-            style={{ minWidth: '36px', minHeight: '36px' }}
+            className="p-2 text-[var(--text-muted)] hover:text-white bg-[var(--bg-elevated)] hover:bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl transition-colors flex items-center justify-center"
+            style={{ minWidth: '38px', minHeight: '38px' }}
             title="Guía de batería y permisos"
             aria-label="Ver guía de batería y permisos"
           >
@@ -289,7 +292,7 @@ export default function NotificationDetectionSection() {
 
       {/* ── Ajuste: Mostrar monto en la notificación ── */}
       <div
-        className="p-3 rounded-xl flex items-center justify-between gap-3"
+        className="p-3.5 rounded-xl flex items-center justify-between gap-3"
         style={{
           background: 'var(--bg-base)',
           border: '1px solid var(--border-subtle)',
@@ -297,7 +300,7 @@ export default function NotificationDetectionSection() {
       >
         <div className="flex flex-col gap-0.5 min-w-0">
           <span className="font-bold text-xs text-white">Mostrar monto en la notificación</span>
-          <p className="text-[10px] text-[var(--text-secondary)] leading-snug">
+          <p className="text-[11px] text-[var(--text-secondary)] leading-snug">
             Si se desactiva o el modo privado está activo, el aviso dirá &quot;MOVIMIENTO DETECTADO EN LA CUENTA&quot; sin revelar la cifra.
           </p>
         </div>
@@ -307,22 +310,15 @@ export default function NotificationDetectionSection() {
           role="switch"
           aria-checked={showAmountInNotification}
           onClick={() => toggleShowAmountInNotification()}
-          className="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
-          style={{
-            background: showAmountInNotification ? 'var(--orange-400)' : 'var(--bg-elevated)',
-            minHeight: '36px',
-            minWidth: '36px',
-            alignItems: 'center',
-          }}
+          className="flex items-center justify-center p-2 text-[var(--text-muted)] hover:text-white transition-colors flex-shrink-0"
+          style={{ minWidth: '44px', minHeight: '44px' }}
           aria-label="Alternar mostrar monto en notificación"
         >
-          <span
-            aria-hidden="true"
-            className="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-            style={{
-              transform: showAmountInNotification ? 'translateX(16px)' : 'translateX(0px)',
-            }}
-          />
+          {showAmountInNotification ? (
+            <ToggleRight size={28} className="text-[var(--orange-400)]" />
+          ) : (
+            <ToggleLeft size={28} className="text-[var(--text-muted)]" />
+          )}
         </button>
       </div>
 
@@ -479,22 +475,15 @@ export default function NotificationDetectionSection() {
                         role="switch"
                         aria-checked={isAllowed}
                         onClick={() => toggleBankApp(app.packageName)}
-                        className="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
-                        style={{
-                          background: isAllowed ? 'var(--orange-400)' : 'var(--border-subtle)',
-                          minHeight: '36px',
-                          minWidth: '36px',
-                          alignItems: 'center',
-                        }}
+                        className="flex items-center justify-center p-1.5 text-[var(--text-muted)] hover:text-white transition-colors"
+                        style={{ minWidth: '40px', minHeight: '40px' }}
                         aria-label={`Marcar ${app.appLabel} como banco`}
                       >
-                        <span
-                          aria-hidden="true"
-                          className="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                          style={{
-                            transform: isAllowed ? 'translateX(16px)' : 'translateX(0px)',
-                          }}
-                        />
+                        {isAllowed ? (
+                          <ToggleRight size={28} className="text-[var(--orange-400)]" />
+                        ) : (
+                          <ToggleLeft size={28} className="text-[var(--text-muted)]" />
+                        )}
                       </button>
                     </div>
                   </div>
@@ -708,22 +697,15 @@ export default function NotificationDetectionSection() {
             role="switch"
             aria-checked={captureModeEnabled}
             onClick={() => toggleCaptureMode()}
-            className="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
-            style={{
-              background: captureModeEnabled ? 'var(--orange-400)' : 'var(--border-subtle)',
-              minHeight: '36px',
-              minWidth: '36px',
-              alignItems: 'center',
-            }}
+            className="flex items-center justify-center p-2 text-[var(--text-muted)] hover:text-white transition-colors flex-shrink-0"
+            style={{ minWidth: '44px', minHeight: '44px' }}
             aria-label="Activar modo captura de muestras"
           >
-            <span
-              aria-hidden="true"
-              className="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-              style={{
-                transform: captureModeEnabled ? 'translateX(16px)' : 'translateX(0px)',
-              }}
-            />
+            {captureModeEnabled ? (
+              <ToggleRight size={28} className="text-[var(--orange-400)]" />
+            ) : (
+              <ToggleLeft size={28} className="text-[var(--text-muted)]" />
+            )}
           </button>
         </div>
 

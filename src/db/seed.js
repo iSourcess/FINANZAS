@@ -55,9 +55,9 @@ const EXPENSE_CATEGORIES = [
   { id: uuid(), name: 'Transporte',type: 'expense', icon: 'Car',             color: DONUT_COLORS[2], sortOrder: 2, hidden: false },
   { id: uuid(), name: 'Casa',      type: 'expense', icon: 'Home',            color: DONUT_COLORS[5], sortOrder: 3, hidden: false },
   { id: uuid(), name: 'Servicios', type: 'expense', icon: 'Zap',             color: DONUT_COLORS[8], sortOrder: 4, hidden: false },
-  { id: uuid(), name: 'Salud',     type: 'expense', icon: 'HeartPulse',      color: DONUT_COLORS[4], sortOrder: 5, hidden: false },
-  { id: uuid(), name: 'Ocio',      type: 'expense', icon: 'Gamepad2',        color: DONUT_COLORS[3], sortOrder: 6, hidden: false },
-  { id: uuid(), name: 'Compras',   type: 'expense', icon: 'ShoppingBag',     color: DONUT_COLORS[6], sortOrder: 7, hidden: false },
+  { id: uuid(), name: 'Salud',       type: 'expense', icon: 'HeartPulse',      color: DONUT_COLORS[4], sortOrder: 5, hidden: false },
+  { id: uuid(), name: 'Plataformas', type: 'expense', icon: 'Tv',              color: DONUT_COLORS[3], sortOrder: 6, hidden: false },
+  { id: uuid(), name: 'Compras',     type: 'expense', icon: 'ShoppingBag',     color: DONUT_COLORS[6], sortOrder: 7, hidden: false },
   { id: uuid(), name: 'Educación', type: 'expense', icon: 'GraduationCap',   color: DONUT_COLORS[7], sortOrder: 8, hidden: false },
   { id: uuid(), name: 'Otros',     type: 'expense', icon: 'MoreHorizontal',  color: DONUT_COLORS[8], sortOrder: 9, hidden: false },
 ]
@@ -115,6 +115,13 @@ export async function runSeed() {
 
     // Si ya hay categorías, solo aseguramos settings si faltan
     if (categoryCount > 0) {
+      // Actualizar 'Ocio' a 'Plataformas' si existía de versiones previas
+      const allCats = await db.categories.toArray()
+      const ocioCat = allCats.find(c => c.name?.toLowerCase() === 'ocio')
+      if (ocioCat) {
+        await db.categories.update(ocioCat.id, { name: 'Plataformas', icon: 'Tv' })
+      }
+
       const existingSettings = await db.settings.get('global')
       if (!existingSettings) {
         await db.settings.add(INITIAL_SETTINGS)

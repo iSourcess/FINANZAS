@@ -23,7 +23,7 @@ import { toISODate } from './periods.js'
 const CATEGORY_KEYWORDS = {
   comida: ['restaurante', 'starbucks', 'mcdonalds', 'uber eats', 'rappi', 'didi food', 'oxxo', 'seven', '7-eleven', 'walmart', 'soriana', 'chedraui', 'costco', 'super', 'taquer', 'cafe', 'cafeteria', 'pizza', 'burger'],
   transporte: ['uber', 'didi', 'cabify', 'gasolinera', 'pemex', 'shell', 'bp', 'mobil', 'estacionamiento', 'peaje', 'tag', 'metro', 'autobus', 'vuelo', 'aeromexico', 'volaris', 'vivaaerobus'],
-  ocio: ['netflix', 'spotify', 'cinepolis', 'cinemex', 'hbo', 'disney', 'prime video', 'youtube', 'apple music', 'steam', 'playstation', 'nintendo', 'xbox', 'concierto', 'teatro'],
+  plataformas: ['netflix', 'spotify', 'cinepolis', 'cinemex', 'hbo', 'max', 'disney', 'prime video', 'youtube', 'apple music', 'steam', 'playstation', 'nintendo', 'xbox', 'crunchyroll', 'paramount', 'concierto', 'teatro', 'cine'],
   casa: ['cfe', 'luz', 'agua', 'renta', 'muebles', 'ikea', 'home depot', 'sodimac', 'liverpool', 'palacio de hierro', 'amazon'],
   servicios: ['telmex', 'totalplay', 'izzy', 'at&t', 'telcel', 'movistar', 'internet', 'gas'],
   salud: ['farmacia', 'san pablo', 'benavides', 'del ahorro', 'guadalajara', 'hospital', 'medico', 'laboratorio', 'chopo', 'dentista', 'optica'],

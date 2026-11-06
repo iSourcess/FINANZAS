@@ -45,6 +45,16 @@ export const useMovements = create((set, get) => ({
         return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
       })
 
+      // Asegurar migración de 'Ocio' a 'Plataformas'
+      const ocioCat = allCategories.find(c => c.name?.toLowerCase() === 'ocio')
+      if (ocioCat) {
+        ocioCat.name = 'Plataformas'
+        ocioCat.icon = 'Tv'
+        db.categories.update(ocioCat.id, { name: 'Plataformas', icon: 'Tv' }).catch(err => {
+          console.warn('[useMovements] Error al actualizar categoría Ocio:', err)
+        })
+      }
+
       // Ordenar categorías por sortOrder
       allCategories.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 

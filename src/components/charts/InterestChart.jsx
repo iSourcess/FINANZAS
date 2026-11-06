@@ -23,6 +23,7 @@ import { Sparkles, Info, X } from 'lucide-react'
 import { getBuckets } from '../../domain/buckets.js'
 import {
   calculateHistoricalInterest,
+  calculateAccountDailyInterest,
   isYieldAccount,
 } from '../../domain/interest.js'
 import { formatMoney } from '../../lib/format.js'
@@ -77,27 +78,92 @@ export default function InterestChart({
     })
   }, [yieldAccounts, movements, buckets, referenceDate, realAccruals])
 
-  // Datos para la gráfica: real para pasado, proyección para futuro
+  // Interés diario esperado base de todas las cuentas activas
+  const dailyExpectedCents = useMemo(() => {
+    return yieldAccounts.reduce((sum, acc) => {
+      const bal = acc.balance || 0
+      if (bal <= 0) return sum
+      return sum + calculateAccountDailyInterest(acc, bal)
+    }, 0)
+  }, [yieldAccounts])
+
+  // Datos acumulados para la gráfica:
+  // Como solicitó el usuario: día 1 = $18, día 2 = $36, día 10 = $180 (acumulación incremental)
+  // - earned: intereses acumulados ganados hasta hoy (línea naranja creciente)
+  // - projected: intereses acumulados esperados a lo largo del periodo (línea gris creciente)
   const chartData = useMemo(() => {
+    let runningEarnedCents = 0
+    let runningExpectedCents = 0
+
+    // Acumulador por cuenta para el desglose
+    const runningByAccountCents = {}
+    yieldAccounts.forEach((acc) => {
+      runningByAccountCents[acc.id] = 0
+    })
+
     return historicalData.bucketSeries.map((b, idx) => {
-      const isPast = b.end < todayStr
-      const totalCents = b.totalInterestCents
+      const isPastOrToday = b.start <= todayStr
+      const pastCents = b.pastInterestCents ?? 0
+      const projectedCents = b.projectedInterestCents ?? 0
+
+      // Esperado para este bucket diario
+      const bucketExpectedCents = b.totalInterestCents > 0
+        ? b.totalInterestCents
+        : (projectedCents > 0 ? projectedCents : (dailyExpectedCents || 0))
+
+      runningExpectedCents += bucketExpectedCents
+
+      if (isPastOrToday) {
+        // En días transcurridos se acumula lo acreditado o estimado
+        const bucketEarned = pastCents > 0 ? pastCents : bucketExpectedCents
+        runningEarnedCents += bucketEarned
+      }
+
+      // Actualizar acumulado por cuenta
+      const breakdown = {}
+      yieldAccounts.forEach((acc) => {
+        const byAccData = b.byAccount?.[acc.id]
+        const dailyForAcc = typeof byAccData === 'number'
+          ? byAccData
+          : (byAccData?.amountCents || calculateAccountDailyInterest(acc, acc.balance || 0))
+        runningByAccountCents[acc.id] = (runningByAccountCents[acc.id] || 0) + dailyForAcc
+        breakdown[acc.id] = {
+          id: acc.id,
+          name: acc.name,
+          themeKey: acc.themeKey || 'default',
+          amountCents: runningByAccountCents[acc.id],
+        }
+      })
 
       return {
         key: `bucket-${idx}`,
         label: b.label,
-        total: totalCents / 100,
-        totalCents,
-        isFuture: !isPast,
-        byAccount: b.byAccount,
+        // earned: acumulado ganado a la fecha (naranja). Solo hasta hoy. Futuro = null
+        earned: isPastOrToday ? (runningEarnedCents / 100) : null,
+        earnedCents: runningEarnedCents,
+        // projected: acumulado esperado del mes (gris). Crece día a día hasta el total del periodo
+        projected: runningExpectedCents / 100,
+        projectedCents: runningExpectedCents,
+        totalCents: runningExpectedCents,
+        isFuture: !isPastOrToday,
+        byAccount: breakdown,
       }
     })
-  }, [historicalData, todayStr])
+  }, [historicalData, todayStr, dailyExpectedCents, yieldAccounts])
 
-  const totalCents = useMemo(
-    () => chartData.reduce((sum, d) => sum + d.totalCents, 0),
-    [chartData]
-  )
+  // Total acumulado ganado a la fecha
+  const totalEarnedCents = useMemo(() => {
+    const pastItems = chartData.filter((d) => !d.isFuture)
+    if (pastItems.length === 0) return 0
+    return pastItems[pastItems.length - 1].earnedCents || 0
+  }, [chartData])
+
+  // Total acumulado esperado al final del periodo
+  const totalExpectedCents = useMemo(() => {
+    if (chartData.length === 0) return 0
+    return chartData[chartData.length - 1].projectedCents || 0
+  }, [chartData])
+
   const hasAnyInterest = chartData.some((d) => d.totalCents > 0)
 
   // Estado vacío si no hay cuentas de rendimiento
@@ -134,6 +200,7 @@ export default function InterestChart({
 
   return (
     <div
+      id="tour-interest-chart"
       className="rounded-2xl p-5 flex flex-col gap-4 transition-all"
       style={{
         background: 'var(--bg-surface)',
@@ -170,22 +237,45 @@ export default function InterestChart({
               </span>
             </div>
             <span className="text-xs text-[var(--text-muted)]">
-              Capitalización diaria en el periodo seleccionado
+              Acumulado progresivo en el periodo seleccionado
             </span>
           </div>
         </div>
 
-        {/* Total acumulado en el periodo */}
+        {/* Total acumulado y esperado en el periodo */}
         <div className="text-right">
           <span className="text-[10px] text-[var(--text-muted)] block">
-            Total del periodo
+            Ganado a hoy / Total mes
           </span>
-          <span
-            className="text-xl font-bold font-mono tracking-tight text-[var(--orange-400)] tabular-nums"
-            style={{ fontVariantNumeric: 'tabular-nums' }}
-          >
-            {formatMoney(totalCents)}
-          </span>
+          <div className="flex items-baseline justify-end gap-1 font-mono">
+            <span
+              className="text-lg sm:text-xl font-bold tracking-tight text-[var(--orange-400)] tabular-nums"
+              style={{ fontVariantNumeric: 'tabular-nums' }}
+              title="Intereses ganados acumulados a la fecha"
+            >
+              {formatMoney(totalEarnedCents)}
+            </span>
+            <span className="text-xs text-[var(--text-muted)]">/</span>
+            <span
+              className="text-xs sm:text-sm font-semibold text-[var(--text-secondary)] tabular-nums"
+              style={{ fontVariantNumeric: 'tabular-nums' }}
+              title="Intereses esperados acumulados al final del periodo"
+            >
+              {formatMoney(totalExpectedCents)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Leyenda de la gráfica ── */}
+      <div className="flex items-center gap-4 text-[11px] font-medium -mt-1">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-[var(--orange-400)]" />
+          <span className="text-white">Ganado acumulado</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-[var(--border-default)]" />
+          <span className="text-[var(--text-muted)]">Esperado acumulado</span>
         </div>
       </div>
 
@@ -238,10 +328,17 @@ export default function InterestChart({
                       <div className="text-[11px] font-sans font-semibold text-[var(--text-secondary)] mb-1">
                         {data.label}
                       </div>
-                      <div className="text-[var(--orange-400)] font-bold text-sm">
-                        {formatMoney(data.totalCents)}
+                      {data.earned !== null && (
+                        <div className="text-[var(--orange-400)] font-bold text-xs flex items-center justify-between gap-3">
+                          <span>Ganado acumulado:</span>
+                          <span>{formatMoney(data.earnedCents)}</span>
+                        </div>
+                      )}
+                      <div className="text-[var(--text-secondary)] font-semibold text-xs flex items-center justify-between gap-3 mt-0.5">
+                        <span>Esperado acumulado:</span>
+                        <span>{formatMoney(data.projectedCents)}</span>
                       </div>
-                      <div className="text-[10px] text-[var(--text-muted)] font-sans mt-1">
+                      <div className="text-[10px] text-[var(--text-muted)] font-sans mt-1.5 border-t border-[var(--border-subtle)] pt-1">
                         Toca el punto para desglose por cuenta
                       </div>
                     </div>
@@ -250,11 +347,33 @@ export default function InterestChart({
                 return null
               }}
             />
+            {/* Línea Gris: Intereses Esperados / Proyectados del mes */}
             <Line
               type="monotone"
-              dataKey="total"
+              dataKey="projected"
+              stroke="#6B7280"
+              strokeWidth={2}
+              strokeDasharray="4 4"
+              dot={{
+                r: 3,
+                fill: '#6B7280',
+                stroke: 'var(--bg-surface)',
+                strokeWidth: 1.5,
+              }}
+              activeDot={{
+                r: 5,
+                fill: '#9CA3AF',
+                stroke: 'var(--bg-base)',
+                strokeWidth: 2,
+              }}
+            />
+            {/* Línea Naranja: Intereses Ganados a la fecha */}
+            <Line
+              type="monotone"
+              dataKey="earned"
               stroke="var(--orange-400)"
               strokeWidth={2.5}
+              connectNulls={false}
               dot={{
                 r: 3.5,
                 fill: 'var(--orange-400)',
@@ -284,7 +403,7 @@ export default function InterestChart({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-[var(--text-primary)]">
-                Desglose: {selectedPoint.label}
+                Desglose acumulado: {selectedPoint.label}
               </span>
               <span className="text-xs font-mono font-bold text-[var(--orange-400)]">
                 {formatMoney(selectedPoint.totalCents)}
@@ -342,7 +461,7 @@ export default function InterestChart({
       <div className="pt-2 border-t border-[var(--border-subtle)] flex items-start gap-2 text-xs text-[var(--text-secondary)]">
         <Info size={14} className="mt-0.5 shrink-0 text-[var(--text-muted)]" />
         <p className="leading-relaxed">
-          Rendimiento estimado del periodo: un total de <strong>{formatMoney(totalCents)}</strong> generado en {yieldAccounts.length} cuenta(s) con tasa activa.
+          Rendimiento acumulado: <strong>{formatMoney(totalEarnedCents)}</strong> ganados a la fecha de un estimado total de <strong>{formatMoney(totalExpectedCents)}</strong> en {yieldAccounts.length} cuenta(s) con tasa activa.
         </p>
       </div>
     </div>

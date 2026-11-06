@@ -129,15 +129,13 @@ export default function App() {
         {/* Redirige la raíz a /registrar */}
         <Route path="/" element={<Navigate to="/registrar" replace />} />
 
-        {/* Rutas con layout (BottomNav) */}
+        {/* Rutas con layout (BottomNav flotante persistente) */}
         <Route element={<AppLayout />}>
           <Route path="/registrar" element={<Register />} />
           <Route path="/panorama"  element={<Overview />}  />
           <Route path="/cuentas"   element={<Accounts />}  />
+          <Route path="/ajustes"   element={<Settings />}  />
         </Route>
-
-        {/* Ajustes sin BottomNav (pantalla completa) */}
-        <Route path="/ajustes" element={<Settings />} />
 
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/registrar" replace />} />

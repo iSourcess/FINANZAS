@@ -122,6 +122,22 @@
     "expected": {
       "ignored": true
     }
+  },
+  {
+    "id": "fixture_9_mercadopago_gastaste",
+    "description": "Gasto en Mercado Pago con emoji de comida y total de gastos de hoy",
+    "packageName": "com.mercadopago.wallet",
+    "appLabel": "Mercado Pago",
+    "title": "Mercadopago Efraingo",
+    "text": "🍽️ Gastaste $50",
+    "bigText": "Gastos de hoy: $200",
+    "expected": {
+      "ignored": false,
+      "amountCents": 5000,
+      "currency": "MXN",
+      "kind": "expense",
+      "hasAmount": true
+    }
   }
 ]
 

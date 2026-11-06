@@ -33,9 +33,9 @@ export const DEFAULT_IGNORE_PATTERNS = [
 ]
 
 export const DEFAULT_EXPENSE_PATTERN =
-  'compra|cargo|pago|pagaste|retiro|enviaste|salida|disposici[oó]n|spent|payment'
+  'compra|cargo|pago|pagaste|retiro|enviaste|salida|disposici[oó]n|spent|payment|gast[oó]|gastaste|gastos|consumo|consumiste'
 export const DEFAULT_INCOME_PATTERN =
-  'dep[oó]sito|abono|recibiste|n[oó]mina|sueldo|reembolso|devoluci[oó]n|received'
+  'dep[oó]sito|abono|recibiste|n[oó]mina|sueldo|reembolso|devoluci[oó]n|received|ingreso|transferencia recibida'
 
 /**
  * Convierte un texto con monto (ej: "$1,250.50", "45.00") en centavos enteros (125050).

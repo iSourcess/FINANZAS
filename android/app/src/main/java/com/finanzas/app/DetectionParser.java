@@ -41,9 +41,9 @@ public class DetectionParser {
     );
 
     public static final String DEFAULT_EXPENSE_PATTERN =
-        "compra|cargo|pago|pagaste|retiro|enviaste|salida|disposici[oó]n|spent|payment";
+        "compra|cargo|pago|pagaste|retiro|enviaste|salida|disposici[oó]n|spent|payment|gast[oó]|gastaste|gastos|consumo|consumiste";
     public static final String DEFAULT_INCOME_PATTERN =
-        "dep[oó]sito|abono|recibiste|n[oó]mina|sueldo|reembolso|devoluci[oó]n|received";
+        "dep[oó]sito|abono|recibiste|n[oó]mina|sueldo|reembolso|devoluci[oó]n|received|ingreso|transferencia recibida";
 
     public static class ParseResult {
         public boolean ignored = false;

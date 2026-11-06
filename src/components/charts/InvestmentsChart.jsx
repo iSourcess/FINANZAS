@@ -87,35 +87,63 @@ export default function InvestmentsChart({
     return map
   }, [priceMap])
 
-  // Cálculo de la serie temporal consolidando TODAS las inversiones
+  // Lotes efectivos: si no hay lotes individuales registrados en db.lots,
+  // sintetiza a partir de las posiciones (holdings) para calcular el total histórico
+  const effectiveLots = useMemo(() => {
+    if (lots && lots.length > 0) return lots
+    return holdings.map((h) => ({
+      id: `synth-${h.id}`,
+      holdingId: h.id,
+      symbol: h.symbol,
+      quantity: h.quantity || 0,
+      priceCents: h.avgCost || 0,
+      costCurrency: h.costCurrency || 'USD',
+      date: h.purchaseDate || (h.createdAt ? h.createdAt.slice(0, 10) : '2020-01-01'),
+    }))
+  }, [lots, holdings])
+
+  // Cálculo de la serie temporal consolidando TODAS las inversiones en dólares
   const gainSeries = useMemo(() => {
     if (holdings.length === 0) return []
 
     return calculatePortfolioGainSeries({
-      holdings, // Todas las inversiones
-      lots,
-      buckets,
+      lots: effectiveLots,
+      dates: buckets,
       priceHistoryMap,
       currentPriceMap: currentPriceSimpleMap,
       fxHistoryMap,
       currentFxRate,
     })
-  }, [holdings, lots, buckets, priceHistoryMap, currentPriceSimpleMap, fxHistoryMap, currentFxRate])
+  }, [holdings, effectiveLots, buckets, priceHistoryMap, currentPriceSimpleMap, fxHistoryMap, currentFxRate])
 
-  // Formato para Recharts LineChart
+  // Formato para Recharts LineChart enfocado en Total Invertido (USD) y Rendimiento en %
   const chartData = useMemo(() => {
-    return gainSeries.map((item) => ({
-      key: item.date,
-      label: item.label,
-      date: item.date,
-      gainMXN: item.gainLossCentsMXN / 100, // en pesos para el eje Y
-      gainCentsMXN: item.gainLossCentsMXN,
-      gainCentsUSD: item.gainLossCentsUSD,
-      valueCentsMXN: item.totalValueCentsMXN,
-      valueCentsUSD: item.totalValueCentsUSD,
-      costCentsMXN: item.totalCostCentsMXN,
-      gainPct: item.gainLossPercent,
-    }))
+    return gainSeries.map((item) => {
+      const costUSD = item.costUSD ?? item.totalCostCentsUSD ?? 0
+      const valueUSD = item.valueUSD ?? item.totalValueCentsUSD ?? 0
+      const gainUSD = item.gainUSD ?? item.gainLossCentsUSD ?? (valueUSD - costUSD)
+      const costMXN = item.costMXN ?? item.totalCostCentsMXN ?? 0
+      const valueMXN = item.valueMXN ?? item.totalValueCentsMXN ?? 0
+      const gainMXN = item.gainMXN ?? item.gainLossCentsMXN ?? (valueMXN - costMXN)
+      const gainPct = item.gainPctUSD ?? item.gainPct ?? (costUSD > 0 ? Number((((valueUSD - costUSD) / costUSD) * 100).toFixed(2)) : 0)
+
+      return {
+        key: item.date,
+        label: item.label,
+        date: item.date,
+        // Eje Y principal: Total invertido en dólares (USD)
+        valueUSD: valueUSD / 100,
+        gainUSD: gainUSD / 100,
+        costUSD: costUSD / 100,
+        costCentsUSD: costUSD,
+        valueCentsUSD: valueUSD,
+        gainCentsUSD: gainUSD,
+        costCentsMXN: costMXN,
+        valueCentsMXN: valueMXN,
+        gainCentsMXN: gainMXN,
+        gainPct,
+      }
+    })
   }, [gainSeries])
 
   const latestGain = useMemo(() => {
@@ -125,8 +153,9 @@ export default function InvestmentsChart({
       gainMXN: last.gainCentsMXN,
       gainUSD: last.gainCentsUSD,
       gainPct: last.gainPct,
-      totalValueMXN: last.valueCentsMXN,
+      totalCostUSD: last.costCentsUSD,
       totalValueUSD: last.valueCentsUSD,
+      totalValueMXN: last.valueCentsMXN,
     }
   }, [chartData])
 
@@ -192,10 +221,12 @@ export default function InvestmentsChart({
     )
   }
 
-  const isPositive = (latestGain?.gainMXN || 0) >= 0
-  const gainColor = isPositive ? 'var(--orange-400)' : 'var(--red-400)'
-  const gainBg = isPositive ? 'var(--orange-900)' : 'var(--red-900)'
-  const gainBorder = isPositive ? 'var(--orange-700)' : 'var(--red-600)'
+  // Regla solicitada: Si es positivo se muestra en naranja; si es negativo o cero, en gris (nunca rojo)
+  const isPositive = (latestGain?.gainUSD || 0) > 0
+  const gainColor = isPositive ? 'var(--orange-400)' : '#9CA3AF'
+  const lineColor = isPositive ? 'var(--orange-400)' : '#6B7280'
+  const gainBg = isPositive ? 'var(--orange-900)' : 'rgba(107, 114, 128, 0.16)'
+  const gainBorder = isPositive ? 'var(--orange-700)' : 'rgba(107, 114, 128, 0.35)'
 
   return (
     <div
@@ -230,20 +261,20 @@ export default function InvestmentsChart({
               Inversiones
             </h3>
             <span className="text-xs text-[var(--text-muted)]">
-              Rendimiento total ({holdings.length} {holdings.length === 1 ? 'activo' : 'activos'})
+              Total invertido en USD ({holdings.length} {holdings.length === 1 ? 'activo' : 'activos'})
             </span>
           </div>
         </div>
 
-        {/* Badge de Ganancia / Pérdida Global */}
+        {/* Total Invertido (USD) y Ganancia/Pérdida en % */}
         <div className="text-right">
           <div className="flex items-baseline justify-end gap-1.5">
             <span
-              className="text-xl font-bold font-mono tracking-tight tabular-nums"
+              className="text-lg sm:text-xl font-bold font-mono tracking-tight tabular-nums"
               style={{ color: gainColor, fontVariantNumeric: 'tabular-nums' }}
+              title="Valor total del portafolio en dólares"
             >
-              {isPositive ? '+' : ''}
-              {formatMoney(latestGain?.gainMXN || 0)}
+              {formatMoney(latestGain?.totalValueUSD || 0, 'USD', { showCurrencyCode: true })}
             </span>
             <span
               className="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded-full"
@@ -252,17 +283,19 @@ export default function InvestmentsChart({
                 color: gainColor,
                 border: `1px solid ${gainBorder}`,
               }}
+              title="Rendimiento porcentual sobre el costo"
             >
-              {isPositive ? '▲' : '▼'} {Math.abs(latestGain?.gainPct || 0)}%
+              {isPositive ? '▲ +' : (latestGain?.gainPct || 0) < 0 ? '▼ ' : ''}
+              {Math.abs(latestGain?.gainPct || 0)}%
             </span>
           </div>
           <span className="text-[10px] text-[var(--text-muted)] font-mono block">
-            Valor: {formatMoney(latestGain?.totalValueMXN || 0)} ≈ {formatMoney(latestGain?.totalValueUSD || 0, 'USD')}
+            Rendimiento: {(latestGain?.gainUSD || 0) > 0 ? '+' : ''}{formatMoney(latestGain?.gainUSD || 0, 'USD')} ({formatMoney(latestGain?.totalValueMXN || 0)})
           </span>
         </div>
       </div>
 
-      {/* ── Gráfica Lineal Recharts (Todas las inversiones) ── */}
+      {/* ── Gráfica Lineal Recharts (Total invertido en USD) ── */}
       <div className="w-full h-56 relative">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
@@ -287,7 +320,8 @@ export default function InvestmentsChart({
               content={({ active, payload }) => {
                 if (active && payload && payload.length) {
                   const data = payload[0].payload
-                  const isPtPositive = data.gainCentsMXN >= 0
+                  const isPtPositive = (data.gainCentsUSD || 0) > 0
+                  const ptColor = isPtPositive ? 'var(--orange-400)' : '#9CA3AF'
                   return (
                     <div
                       className="rounded-xl p-3 shadow-xl text-xs font-mono"
@@ -300,14 +334,17 @@ export default function InvestmentsChart({
                       <div className="text-[11px] font-sans font-semibold text-[var(--text-secondary)] mb-1">
                         {data.label}
                       </div>
-                      <div
-                        className="font-bold text-sm"
-                        style={{ color: isPtPositive ? 'var(--orange-400)' : 'var(--red-400)' }}
-                      >
-                        {isPtPositive ? '+' : ''}{formatMoney(data.gainCentsMXN)} ({isPtPositive ? '+' : ''}{data.gainPct}%)
+                      <div className="text-xs text-[var(--text-primary)] font-bold mb-0.5">
+                        Total: {formatMoney(data.valueCentsUSD, 'USD', { showCurrencyCode: true })}
                       </div>
-                      <div className="text-[10px] text-[var(--text-muted)] mt-1">
-                        Valor portafolio: {formatMoney(data.valueCentsMXN)}
+                      <div
+                        className="font-bold text-xs"
+                        style={{ color: ptColor }}
+                      >
+                        Rendimiento: {isPtPositive ? '+' : ''}{formatMoney(data.gainCentsUSD, 'USD')} ({isPtPositive ? '+' : ''}{data.gainPct}%)
+                      </div>
+                      <div className="text-[10px] text-[var(--text-muted)] mt-1 border-t border-[var(--border-subtle)] pt-1">
+                        Equiv: {formatMoney(data.valueCentsMXN)}
                       </div>
                     </div>
                   )
@@ -317,18 +354,18 @@ export default function InvestmentsChart({
             />
             <Line
               type="monotone"
-              dataKey="gainMXN"
-              stroke={gainColor}
+              dataKey="valueUSD"
+              stroke={lineColor}
               strokeWidth={2.5}
               dot={{
                 r: 3.5,
-                fill: gainColor,
+                fill: lineColor,
                 stroke: 'var(--bg-surface)',
                 strokeWidth: 2,
               }}
               activeDot={{
                 r: 6,
-                fill: gainColor,
+                fill: lineColor,
                 stroke: 'var(--bg-base)',
                 strokeWidth: 2.5,
               }}
@@ -341,8 +378,11 @@ export default function InvestmentsChart({
       <div className="pt-2 border-t border-[var(--border-subtle)] flex items-start gap-2 text-xs text-[var(--text-secondary)]">
         <Info size={14} className="mt-0.5 shrink-0 text-[var(--text-muted)]" />
         <p className="leading-relaxed">
-          Rendimiento consolidado del portafolio en el periodo: {isPositive ? 'ganancia' : 'pérdida'} de{' '}
-          <strong style={{ color: gainColor }}>{formatMoney(latestGain?.gainMXN || 0)}</strong> ({latestGain?.gainPct || 0}%), sobre un valor total de {formatMoney(latestGain?.totalValueMXN || 0)}.
+          Rendimiento consolidado en dólares (USD): {isPositive ? 'ganancia' : 'pérdida o neutral'} de{' '}
+          <strong style={{ color: gainColor }}>
+            {(latestGain?.gainUSD || 0) > 0 ? '+' : ''}{formatMoney(latestGain?.gainUSD || 0, 'USD')} ({latestGain?.gainPct || 0}%)
+          </strong>
+          , sobre un total invertido de <strong>{formatMoney(latestGain?.totalValueUSD || 0, 'USD', { showCurrencyCode: true })}</strong>.
         </p>
       </div>
     </div>

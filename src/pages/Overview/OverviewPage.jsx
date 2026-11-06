@@ -29,6 +29,7 @@ import {
   Zap,
   HeartPulse,
   Gamepad2,
+  Tv,
   ShoppingBag,
   GraduationCap,
   MoreHorizontal,
@@ -63,6 +64,7 @@ import ConfirmIncomeOccurrenceModal from '../../components/forms/ConfirmIncomeOc
 import PendingDetectionsCard from '../../components/notifications/PendingDetectionsCard.jsx'
 import ReviewDetectionsModal from '../../components/notifications/ReviewDetectionsModal.jsx'
 import Toast from '../../components/ui/Toast.jsx'
+import ErrorBoundary from '../../components/ui/ErrorBoundary.jsx'
 import { getPeriodRange, getPreviousPeriodRange, isDateInRange, toISODate } from '../../domain/periods.js'
 import { calculatePeriodSummaries } from '../../domain/summaries.js'
 import { calculateBudgetsSummary } from '../../domain/budgets.js'
@@ -78,6 +80,7 @@ const ICON_MAP = {
   Zap,
   HeartPulse,
   Gamepad2,
+  Tv,
   ShoppingBag,
   GraduationCap,
   MoreHorizontal,
@@ -406,24 +409,28 @@ export default function OverviewPage() {
 
       {/* ── Gráficas: Intereses Ganados e Inversiones (Obedecen al PeriodFilter) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <InterestChart
-          accounts={accounts}
-          movements={movements}
-          period={{
-            type: periodType,
-            startDate: currentRange?.startDate,
-            endDate: currentRange?.endDate,
-          }}
-          referenceDate={new Date()}
-        />
-        <InvestmentsChart
-          period={{
-            type: periodType,
-            startDate: currentRange?.startDate,
-            endDate: currentRange?.endDate,
-          }}
-          referenceDate={new Date()}
-        />
+        <ErrorBoundary title="Gráfica de Intereses">
+          <InterestChart
+            accounts={accounts}
+            movements={movements}
+            period={{
+              type: periodType,
+              startDate: currentRange?.startDate,
+              endDate: currentRange?.endDate,
+            }}
+            referenceDate={new Date()}
+          />
+        </ErrorBoundary>
+        <ErrorBoundary title="Gráfica de Inversiones">
+          <InvestmentsChart
+            period={{
+              type: periodType,
+              startDate: currentRange?.startDate,
+              endDate: currentRange?.endDate,
+            }}
+            referenceDate={new Date()}
+          />
+        </ErrorBoundary>
       </div>
 
       {/* ── Flujos Recurrentes: Ingresos Esperados y Gastos Fijos ── */}
@@ -542,7 +549,7 @@ export default function OverviewPage() {
                         <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)] mt-0.5 flex-wrap">
                           <span>Esperado: {occ.dueDate}</span>
                           {cat && <span>• {cat.name}</span>}
-                          {acc && <span>• {accountLabel(acc)}</span>}
+                          {acc && <span>• {acc.name}</span>}
                         </div>
                       </div>
                       <span className="font-mono text-xs font-bold text-emerald-400 tabular-nums flex-shrink-0">
@@ -710,44 +717,55 @@ export default function OverviewPage() {
                 return (
                   <div
                     key={item.fixedExpense.id}
-                    className="p-3 rounded-xl flex flex-col gap-2 transition-colors"
+                    className="p-3.5 rounded-2xl flex flex-col gap-2.5 transition-colors"
                     style={{
                       background: 'var(--bg-elevated)',
                       border: isOverdue ? '1px solid var(--red-700)' : '1px solid var(--border-subtle)',
                     }}
                   >
-                    {/* Primera fila: nombre, badges, monto */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex flex-col min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-xs text-white truncate">
-                            {item.fixedExpense.name}
+                    {/* Primera fila: nombre, badges y monto */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <span className="font-bold text-sm text-white tracking-wide truncate">
+                          {item.fixedExpense.name}
+                        </span>
+                        {isOverdue && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[var(--red-900)] text-[var(--red-400)] border border-[var(--red-700)]">
+                            Vencido
                           </span>
-                          {isOverdue && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[var(--red-900)] text-[var(--red-400)]">
-                              Vencido
-                            </span>
-                          )}
-                          {isDueToday && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[var(--orange-900)] text-[var(--orange-400)]">
-                              Vence hoy
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)] mt-0.5">
-                          <span>Vence {item.dueDate.slice(8, 10)} de este mes</span>
-                          {cat && <span>• {cat.name}</span>}
-                          {acc && <span>• {accountLabel(acc)}</span>}
-                        </div>
+                        )}
+                        {isDueToday && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[var(--orange-900)] text-[var(--orange-400)] border border-[var(--orange-700)]">
+                            Vence hoy
+                          </span>
+                        )}
                       </div>
-                      <span className="font-mono text-xs font-bold text-white tabular-nums flex-shrink-0">
+                      <span className="font-mono text-sm font-bold text-white tabular-nums flex-shrink-0">
                         {formatMoney(item.fixedExpense.amount)}
                       </span>
                     </div>
 
-                    {/* Segunda fila: botones */}
-                    <div className="flex items-center gap-2 justify-end">
+                    {/* Segunda fila: detalles (vencimiento, categoría, cuenta) */}
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-secondary)]">
+                      <span>Vence el día {parseInt(item.dueDate.slice(8, 10), 10)}</span>
+                      {cat && (
+                        <>
+                          <span className="text-[var(--text-muted)]">•</span>
+                          <span>{cat.name}</span>
+                        </>
+                      )}
+                      {acc && (
+                        <>
+                          <span className="text-[var(--text-muted)]">•</span>
+                          <span>{acc.name}</span>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Tercera fila: botones de acción organizados */}
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--border-subtle)] mt-1">
                       <button
+                        type="button"
                         onClick={async () => {
                           try {
                             await markFixedAsPaidManually(item)
@@ -755,13 +773,14 @@ export default function OverviewPage() {
                             console.error('Error al marcar como pagado:', err)
                           }
                         }}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white hover:border-[var(--text-secondary)] transition-colors"
+                        className="flex items-center justify-center gap-1 px-3 py-2.5 rounded-xl text-xs font-semibold border border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white hover:border-[var(--text-secondary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] transition-all active:scale-[0.98]"
                         title="Marcar como pagado (ya lo pagué por otro medio)"
-                        style={{ minHeight: '44px' }}
+                        style={{ minHeight: '42px' }}
                       >
                         Ya lo pagué
                       </button>
                       <button
+                        type="button"
                         onClick={async () => {
                           try {
                             await confirmRecurringExpense(item)
@@ -770,11 +789,11 @@ export default function OverviewPage() {
                             console.error('Error al confirmar gasto fijo:', err)
                           }
                         }}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[var(--orange-500)] hover:bg-[var(--orange-400)] text-black transition-colors"
+                        className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold bg-[var(--orange-500)] hover:bg-[var(--orange-400)] text-black transition-all active:scale-[0.98] shadow-sm"
                         title="Confirmar y registrar movimiento"
-                        style={{ minHeight: '44px' }}
+                        style={{ minHeight: '42px' }}
                       >
-                        <Check size={13} />
+                        <Check size={15} strokeWidth={2.5} />
                         <span>Pagar</span>
                       </button>
                     </div>

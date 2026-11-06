@@ -169,6 +169,173 @@ export const DEFAULT_YIELD_TIERS = {
   ],
 };
 
+/**
+ * Tasas de rendimiento automáticas para tarjetas de DÉBITO.
+ * Se autocompletan al seleccionar el banco en el formulario de cuenta.
+ *
+ * ⚠️ IMPORTANTE: estas tasas aplican ÚNICAMENTE a cuentas de débito (cuenta principal).
+ * Las tasas de ahorro/cajitas/apartados se configuran aparte en cada cuenta de ahorro.
+ *
+ * Fuente: deceroalinfinito.com — Última actualización: Noviembre 2026
+ *
+ * Estructura de cada entrada:
+ *   tiers   → tramos de rendimiento [{ upTo (centavos), rate (decimal) }]
+ *   label   → descripción corta que se muestra en la UI
+ *   source  → URL de referencia
+ */
+export const DEBIT_YIELD_PRESETS = {
+  // ── Neobancos y Fintech MX ──────────────────────────────────────────────
+
+  /** Nu Débito: 13% a la vista sin límite en saldo base de la cuenta */
+  nu: {
+    tiers: [{ upTo: null, rate: 0.13 }],
+    label: '13% a la vista (cuenta Nu)',
+    source: 'deceroalinfinito.com',
+  },
+
+  /** Revolut Débito: 15% hasta $25,000; 7% sobre excedente */
+  revolut: {
+    tiers: [
+      { upTo: 2_500_000, rate: 0.15 },
+      { upTo: null,      rate: 0.07 },
+    ],
+    label: '15% hasta $25,000 · 7% excedente',
+    source: 'deceroalinfinito.com',
+  },
+
+  /** Mercado Pago (con Meli+): 15% hasta $25,000; 5.4% sobre excedente (fondo GBM) */
+  mercadoPago: {
+    tiers: [
+      { upTo: 2_500_000, rate: 0.15 },
+      { upTo: null,      rate: 0.054 },
+    ],
+    label: '15% hasta $25,000 · 5.4% excedente (requiere Meli+)',
+    source: 'deceroalinfinito.com',
+  },
+
+  /** DiDi Cuenta (SOFIPO): 15% hasta $10,000; 7.5% sobre excedente */
+  didi: {
+    tiers: [
+      { upTo: 1_000_000, rate: 0.15 },
+      { upTo: null,      rate: 0.075 },
+    ],
+    label: '15% hasta $10,000 · 7.5% excedente',
+    source: 'deceroalinfinito.com',
+  },
+
+  /** Klar Plus/Platino (SOFIPO): 15% hasta $25,000; tasa base 5% sobre excedente */
+  klar: {
+    tiers: [
+      { upTo: 2_500_000, rate: 0.15 },
+      { upTo: null,      rate: 0.05 },
+    ],
+    label: '15% hasta $25,000 · 5% excedente (requiere Klar Plus/Platino)',
+    source: 'deceroalinfinito.com',
+  },
+
+  /** Stori (SOFIPO): 7.25% a la vista sin límite */
+  stori: {
+    tiers: [{ upTo: null, rate: 0.0725 }],
+    label: '7.25% a la vista (Stori Cuenta+)',
+    source: 'deceroalinfinito.com',
+  },
+
+  /** Finsus+ (SOFIPO): 7% a la vista; más alto a plazos fijos (ver apartados) */
+  finsus: {
+    tiers: [{ upTo: null, rate: 0.07 }],
+    label: '7% a la vista (Finsus+)',
+    source: 'deceroalinfinito.com',
+  },
+
+  /** Kubo Financiero (SOFIPO): 7.5% a la vista en liquidez diaria */
+  kuboFinanciero: {
+    tiers: [{ upTo: null, rate: 0.075 }],
+    label: '7.5% a la vista (liquidez diaria)',
+    source: 'deceroalinfinito.com',
+  },
+
+  /** Hey Banco (Banco): 4% en cuenta base; hasta 7.5% en pagaré a 7 días */
+  heyBanco: {
+    tiers: [{ upTo: null, rate: 0.04 }],
+    label: '4% a la vista (Ahorro Hey base)',
+    source: 'deceroalinfinito.com',
+  },
+
+  // ── Bancos tradicionales MX ──────────────────────────────────────────────
+  // ⚠️ Los bancos tradicionales NO ofrecen rendimiento significativo en débito.
+  // Sus tasas son meramente informativas y muy por debajo de la inflación.
+
+  /** BBVA Débito: sin rendimiento a la vista */
+  bbva: {
+    tiers: [{ upTo: null, rate: 0.00 }],
+    label: 'Sin rendimiento a la vista',
+    source: 'deceroalinfinito.com',
+  },
+
+  /** Banorte Débito: sin rendimiento a la vista */
+  banorte: {
+    tiers: [{ upTo: null, rate: 0.00 }],
+    label: 'Sin rendimiento a la vista',
+    source: 'deceroalinfinito.com',
+  },
+
+  /** Santander Débito: sin rendimiento a la vista */
+  santander: {
+    tiers: [{ upTo: null, rate: 0.00 }],
+    label: 'Sin rendimiento a la vista',
+    source: 'deceroalinfinito.com',
+  },
+
+  /** HSBC Débito: sin rendimiento a la vista */
+  hsbc: {
+    tiers: [{ upTo: null, rate: 0.00 }],
+    label: 'Sin rendimiento a la vista',
+    source: 'deceroalinfinito.com',
+  },
+
+  /** Scotiabank Débito: sin rendimiento a la vista */
+  scotiabank: {
+    tiers: [{ upTo: null, rate: 0.00 }],
+    label: 'Sin rendimiento a la vista',
+    source: 'deceroalinfinito.com',
+  },
+
+  /** Banamex (Citibanamex) Débito: sin rendimiento a la vista */
+  banamex: {
+    tiers: [{ upTo: null, rate: 0.00 }],
+    label: 'Sin rendimiento a la vista',
+    source: 'deceroalinfinito.com',
+  },
+
+  /** Inbursa Débito: sin rendimiento a la vista */
+  inbursa: {
+    tiers: [{ upTo: null, rate: 0.00 }],
+    label: 'Sin rendimiento a la vista',
+    source: 'deceroalinfinito.com',
+  },
+
+  /** BanCoppel Débito: sin rendimiento a la vista */
+  bancoppel: {
+    tiers: [{ upTo: null, rate: 0.00 }],
+    label: 'Sin rendimiento a la vista',
+    source: 'deceroalinfinito.com',
+  },
+
+  /** Banco Azteca Débito: sin rendimiento a la vista */
+  bancoAzteca: {
+    tiers: [{ upTo: null, rate: 0.00 }],
+    label: 'Sin rendimiento a la vista',
+    source: 'deceroalinfinito.com',
+  },
+
+  /** BanRegio Débito: sin rendimiento a la vista */
+  banregio: {
+    tiers: [{ upTo: null, rate: 0.00 }],
+    label: 'Sin rendimiento a la vista',
+    source: 'deceroalinfinito.com',
+  },
+};
+
 /* ── Inversiones preconfiguradas ───────────────────────────*/
 
 export const PRESET_HOLDINGS = [

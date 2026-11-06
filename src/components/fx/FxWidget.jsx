@@ -113,12 +113,11 @@ export default function FxWidget() {
   return (
     <section
       aria-label="Widget de tipos de cambio de divisas"
-      className="relative w-full rounded-2xl flex flex-col justify-between"
+      className="relative w-full rounded-2xl flex flex-col justify-between overflow-hidden"
       style={{
-        background: 'var(--bg-surface)',
+        background: 'linear-gradient(135deg, rgba(26, 26, 26, 0.9) 0%, rgba(17, 17, 17, 0.95) 100%)',
         border: '1px solid var(--border-subtle)',
-        minHeight: '80px',
-        boxShadow: '0 4px 14px -2px rgba(0, 0, 0, 0.35)',
+        boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.45)',
       }}
       onKeyDown={handleKeyDown}
       tabIndex={0}
@@ -144,10 +143,9 @@ export default function FxWidget() {
           return (
             <div
               key={pairItem.code}
-              className="w-full flex-shrink-0 snap-center p-3.5 flex items-center justify-between gap-3 transition-all duration-300"
+              className="w-full flex-shrink-0 snap-center px-4 py-3 sm:py-3.5 flex items-center justify-between gap-3 transition-colors duration-300"
               style={{
-                // Destello suave si el valor acaba de cambiar, respetando reduced-motion en CSS
-                background: changed ? 'var(--orange-900)' : 'transparent',
+                background: changed ? 'rgba(255, 122, 26, 0.12)' : 'transparent',
               }}
               onTouchStart={() => handleTouchStart(pairItem.code)}
               onTouchEnd={handleTouchEnd}
@@ -155,28 +153,32 @@ export default function FxWidget() {
               onMouseUp={handleTouchEnd}
               onMouseLeave={handleTouchEnd}
             >
-              {/* Lado izquierdo: Par, bandera y botón estrella principal */}
+              {/* Lado izquierdo: Estrella sutil, Par con Badge elegante y hora */}
               <div className="flex items-center gap-2.5 min-w-0">
                 <button
                   type="button"
                   onClick={() => setPrimaryFxCurrency(pairItem.code)}
                   title={isPrimary ? 'Moneda principal fijada' : `Fijar ${pairItem.code} como principal`}
                   aria-label={`Fijar ${pairItem.code} como principal`}
-                  className="min-w-[44px] min-h-[44px] -ml-2 -my-2 flex items-center justify-center rounded-xl text-[var(--text-muted)] hover:text-[var(--orange-400)] transition-colors"
+                  className="w-8 h-8 -ml-1 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--orange-400)] hover:bg-white/5 transition-all flex-shrink-0"
                 >
                   <Star
-                    size={16}
-                    className={isPrimary ? 'text-[var(--orange-400)] fill-[var(--orange-400)]' : 'text-[var(--text-muted)] opacity-60'}
+                    size={15}
+                    className={
+                      isPrimary
+                        ? 'text-[var(--orange-400)] fill-[var(--orange-400)] drop-shadow-[0_0_8px_rgba(255,122,26,0.5)]'
+                        : 'opacity-40 hover:opacity-100'
+                    }
                   />
                 </button>
 
                 <div className="flex flex-col min-w-0">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <span
                       style={{
                         fontFamily: "'Space Grotesk', sans-serif",
                         fontWeight: 700,
-                        fontSize: '14px',
+                        fontSize: '15px',
                         color: 'var(--text-primary)',
                         letterSpacing: '-0.01em',
                       }}
@@ -185,11 +187,11 @@ export default function FxWidget() {
                     </span>
                     {isPrimary && (
                       <span
-                        className="px-1.5 py-0.2 rounded text-[9px] font-semibold uppercase tracking-wider"
+                        className="px-1.5 py-0.5 rounded-full text-[9px] font-bold tracking-wider uppercase"
                         style={{
-                          background: 'var(--orange-900)',
+                          background: 'rgba(255, 122, 26, 0.15)',
                           color: 'var(--orange-400)',
-                          border: '1px solid var(--orange-700)',
+                          border: '1px solid rgba(255, 122, 26, 0.3)',
                         }}
                       >
                         Principal
@@ -197,13 +199,14 @@ export default function FxWidget() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-secondary)] mt-0.5">
-                    <span className="flex items-center gap-1">
-                      <Clock size={10} className="opacity-70" />
+                  <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)] mt-0.5">
+                    <span className="flex items-center gap-1 font-mono">
+                      <Clock size={10} className="opacity-60" />
                       {relativeTime}
                     </span>
                     {isStale && (
-                      <span className="flex items-center gap-0.5 text-[var(--orange-400)]" title="Sin conexión: cotización en caché">
+                      <span className="flex items-center gap-0.5 text-[var(--orange-400)] font-medium" title="Sin conexión: cotización en caché">
+                        <span>·</span>
                         <WifiOff size={10} />
                         Caché
                       </span>
@@ -212,55 +215,71 @@ export default function FxWidget() {
                 </div>
               </div>
 
-              {/* Lado derecho: Cotización, variación con icono + texto, y botón manual refresh */}
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <div className="text-right">
+              {/* Lado derecho: Precio grande y variación en chip estilizado */}
+              <div className="flex items-center gap-2.5 flex-shrink-0">
+                <div className="text-right flex flex-col items-end">
                   <span
-                    className="block font-bold text-base sm:text-lg"
-                    style={{
-                      fontFamily: "'Space Grotesk', sans-serif",
-                      color: 'var(--text-primary)',
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
+                    className="font-bold text-base sm:text-lg tracking-tight font-mono text-white"
+                    style={{ fontVariantNumeric: 'tabular-nums' }}
                   >
                     ${formatFxRate(rate)}
                   </span>
 
-                  {/* Variación porcentual: ícono + texto (nunca solo color) */}
-                  <div className="flex items-center justify-end gap-1 mt-0.5">
+                  {/* Badge de Variación porcentual estilo Finanzas moderno */}
+                  <div className="mt-0.5">
                     {direction === 'up' && (
-                      <span className="flex items-center gap-0.5 text-[11px] font-semibold text-emerald-400" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                        <TrendingUp size={12} aria-hidden="true" />
-                        <span>▲ +{Math.abs(changePct).toFixed(2)}%</span>
+                      <span
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono text-emerald-400"
+                        style={{
+                          background: 'rgba(52, 211, 153, 0.12)',
+                          border: '1px solid rgba(52, 211, 153, 0.25)',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        <TrendingUp size={11} strokeWidth={2.5} aria-hidden="true" />
+                        <span>+{Math.abs(changePct).toFixed(2)}%</span>
                       </span>
                     )}
                     {direction === 'down' && (
-                      <span className="flex items-center gap-0.5 text-[11px] font-semibold text-[var(--red-400)]" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                        <TrendingDown size={12} aria-hidden="true" />
-                        <span>▼ -{Math.abs(changePct).toFixed(2)}%</span>
+                      <span
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono text-[var(--red-400)]"
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.12)',
+                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        <TrendingDown size={11} strokeWidth={2.5} aria-hidden="true" />
+                        <span>-{Math.abs(changePct).toFixed(2)}%</span>
                       </span>
                     )}
                     {direction === 'neutral' && (
-                      <span className="flex items-center gap-0.5 text-[11px] font-medium text-[var(--text-muted)]" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                        <Minus size={12} aria-hidden="true" />
+                      <span
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium font-mono text-[var(--text-muted)]"
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        <Minus size={11} aria-hidden="true" />
                         <span>0.00%</span>
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* Botón táctil de refresco manual */}
+                {/* Botón sutil de refresco manual */}
                 <button
                   type="button"
                   onClick={() => fetchRates(activePairs.map(p => p.code))}
                   disabled={loading}
                   aria-label="Actualizar tipo de cambio"
                   title="Refrescar cotización ahora"
-                  className="min-w-[44px] min-h-[44px] -mr-2 -my-2 flex items-center justify-center rounded-xl text-[var(--text-muted)] hover:text-white transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-white hover:bg-white/5 transition-colors"
                 >
                   <RefreshCw
-                    size={14}
-                    className={loading ? 'animate-spin text-[var(--orange-400)]' : 'opacity-70 hover:opacity-100'}
+                    size={13}
+                    className={loading ? 'animate-spin text-[var(--orange-400)]' : 'opacity-60 hover:opacity-100'}
                   />
                 </button>
               </div>
@@ -269,19 +288,19 @@ export default function FxWidget() {
         })}
       </div>
 
-      {/* ── Puntos de Paginación del Carrusel (si hay más de 1 divisa activa) ── */}
+      {/* ── Puntos de Paginación del Carrusel (Integrados con diseño sutil) ── */}
       {activePairs.length > 1 && (
-        <div className="flex items-center justify-center gap-1.5 pb-1.5 -mt-1" aria-hidden="true">
+        <div className="flex items-center justify-center gap-1.5 pb-2 pt-0.5" aria-hidden="true">
           {activePairs.map((pairItem, idx) => (
             <button
               key={pairItem.code}
               type="button"
               onClick={() => scrollToIndex(idx)}
               aria-label={`Ir a ${pairItem.pair}`}
-              className="w-1.5 h-1.5 rounded-full transition-all duration-200"
+              className="h-1 rounded-full transition-all duration-300"
               style={{
-                background: idx === activeIndex ? 'var(--orange-400)' : 'var(--border-default)',
-                width: idx === activeIndex ? '16px' : '6px',
+                background: idx === activeIndex ? 'var(--orange-400)' : 'rgba(255, 255, 255, 0.15)',
+                width: idx === activeIndex ? '16px' : '5px',
               }}
             />
           ))}

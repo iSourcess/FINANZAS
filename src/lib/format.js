@@ -125,7 +125,7 @@ export function formatCardDigits(last4) {
 
 /**
  * Devuelve la etiqueta de cuenta con tipo de cuenta incluido.
- * Formato: "Nombre · Tipo" (ej: "Revolut · Crédito")
+ * Formato: "Nombre · Tipo" (ej: "Revolut · Crédito", o solo "Efectivo" si nombre y tipo son iguales)
  *
  * @param {Object|null|undefined} account - Objeto de cuenta { name, type }
  * @returns {string}
@@ -140,6 +140,10 @@ export function accountLabel(account) {
   }
   const typeName = typeLabels[account.type] || account.type || ''
   if (!typeName) return account.name || 'Cuenta'
+  // Si el nombre ya es igual al tipo (ej: "Efectivo" y tipo "Efectivo"), no duplicar
+  if (account.name?.trim().toLowerCase() === typeName.trim().toLowerCase()) {
+    return typeName
+  }
   return `${account.name} · ${typeName}`
 }
 

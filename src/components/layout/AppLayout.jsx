@@ -7,14 +7,32 @@
  */
 
 import { useEffect } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useNavigate } from 'react-router-dom'
 import BottomNav from './BottomNav.jsx'
+import ErrorBoundary from '../ui/ErrorBoundary.jsx'
+import SpotlightTour from '../ui/SpotlightTour.jsx'
 import { useBudgets } from '../../store/useBudgets.js'
+import { useSettings } from '../../store/useSettings.js'
+import { useTour } from '../../store/useTour.js'
 
 export default function AppLayout() {
+  const navigate = useNavigate()
+  const { fetchSettings } = useSettings()
+  const { startTour, isOpen } = useTour()
+
   useEffect(() => {
     useBudgets.getState().fetchBudgets()
-  }, [])
+    fetchSettings().then((s) => {
+      // Si el usuario es nuevo y nunca ha visto el tour, lo iniciamos automáticamente
+      if (s && s.hasSeenTour === false && !isOpen) {
+        const timer = setTimeout(() => {
+          startTour(0, navigate)
+        }, 900)
+        return () => clearTimeout(timer)
+      }
+    })
+  }, [fetchSettings, startTour, isOpen, navigate])
+
   return (
     <div
       className="flex flex-col"
@@ -27,15 +45,20 @@ export default function AppLayout() {
       <main
         className="flex-1 overflow-y-auto overflow-x-hidden"
         style={{
-          // Deja espacio para el BottomNav (64px) + safe area inferior
-          paddingBottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+          // Deja espacio para el BottomNav flotante (62px + margen 14px) + safe area inferior
+          paddingBottom: 'calc(88px + env(safe-area-inset-bottom, 0px))',
         }}
       >
-        <Outlet />
+        <ErrorBoundary title="No se pudo cargar esta sección">
+          <Outlet />
+        </ErrorBoundary>
       </main>
 
       {/* Navegación inferior fija */}
       <BottomNav />
+
+      {/* Tour Guiado Interactivo con Spotlight */}
+      <SpotlightTour />
     </div>
   )
 }

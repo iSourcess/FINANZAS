@@ -27,6 +27,7 @@ import Modal from '../ui/Modal.jsx'
 import Button from '../ui/Button.jsx'
 import {
   DEFAULT_YIELD_TIERS,
+  DEBIT_YIELD_PRESETS,
   BANK_STYLES,
   BANK_GROUPS,
 } from '../../lib/constants.js'
@@ -77,6 +78,7 @@ export default function AccountForm({
   useEffect(() => {
     if (isOpen) {
       setErrorMsg('')
+      setConfirmDelete(false)
       setShowAllBanks(false)
       setBankSearch('')
       setSelectedBankGroup('all')
@@ -184,6 +186,19 @@ export default function AccountForm({
           if (revDebit) setParentId(revDebit.id)
         }
       }
+    }
+  }
+
+  /**
+   * Aplica automáticamente el preset de débito del banco seleccionado.
+   * Solo actúa sobre cuentas de tipo 'debit'; en 'savings' no toca nada.
+   */
+  const applyDebitPresetForBank = (bankId) => {
+    if (type !== 'debit') return
+    const preset = DEBIT_YIELD_PRESETS[bankId]
+    if (preset) {
+      setYieldTiers(JSON.parse(JSON.stringify(preset.tiers)))
+      setYieldCapBase('balance')
     }
   }
 
@@ -458,7 +473,7 @@ export default function AccountForm({
                 <button
                   key={theme.id}
                   type="button"
-                  onClick={() => setThemeKey(theme.id)}
+                  onClick={() => { setThemeKey(theme.id); applyDebitPresetForBank(theme.id) }}
                   className="flex items-center gap-2 p-2 rounded-lg border text-left transition-all"
                   style={{
                     background: 'var(--bg-elevated)',
@@ -645,6 +660,47 @@ export default function AccountForm({
               </button>
             </div>
 
+            {/* Aviso: autocompletado solo aplica en débito */}
+            {type === 'debit' && DEBIT_YIELD_PRESETS[themeKey] && (
+              <div
+                className="flex items-start gap-2 p-2.5 rounded-lg text-[11px]"
+                style={{
+                  background: 'rgba(251, 191, 36, 0.08)',
+                  border: '1px solid rgba(251, 191, 36, 0.25)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                <Sparkles size={12} className="mt-0.5 flex-shrink-0" style={{ color: '#FBBF24' }} />
+                <span>
+                  <span style={{ color: '#FBBF24', fontWeight: 600 }}>Tasa autocompletada</span>
+                  {' '}según {BANK_STYLES.find(b => b.id === themeKey)?.label || themeKey}:{' '}
+                  <span style={{ color: 'white' }}>{DEBIT_YIELD_PRESETS[themeKey].label}</span>
+                  {' '}· Fuente: {DEBIT_YIELD_PRESETS[themeKey].source}
+                </span>
+              </div>
+            )}
+
+            {/* Aviso explícito: las tasas autocompletadas NO aplican en cuentas de ahorro */}
+            {type === 'savings' && (
+              <div
+                className="flex items-start gap-2 p-2.5 rounded-lg text-[11px]"
+                style={{
+                  background: 'rgba(99, 102, 241, 0.08)',
+                  border: '1px solid rgba(99, 102, 241, 0.25)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                <ShieldAlert size={12} className="mt-0.5 flex-shrink-0" style={{ color: '#818CF8' }} />
+                <span>
+                  <span style={{ color: '#818CF8', fontWeight: 600 }}>Cuenta de Ahorro / Cajita / Apartado</span>
+                  {' '}— El autocompletado de tasas desde el banco{' '}
+                  <span style={{ color: 'white', fontWeight: 600 }}>NO aplica aquí</span>.
+                  {' '}Configura manualmente los tramos o usa los presets de abajo
+                  (Cajita Turbo, Apartado MP, etc.) que ya incluyen las tasas correctas de ahorro.
+                </span>
+              </div>
+            )}
+
             {/* Presets rápidos */}
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[11px] text-[var(--text-muted)]">Presets:</span>
@@ -667,7 +723,7 @@ export default function AccountForm({
                 onClick={() => handleApplyPreset('mercadoPago')}
                 className="text-[11px] px-2 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-white"
               >
-                Mercado Pago Apartado (15%/5.3%)
+                Mercado Pago Apartado (15%/5.4%)
               </button>
               <button
                 type="button"

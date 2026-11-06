@@ -126,7 +126,11 @@ public class NotificationDetectionPlugin extends Plugin {
                 intent = new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
             }
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(intent);
+            if (getActivity() != null) {
+                getActivity().startActivity(intent);
+            } else {
+                getContext().startActivity(intent);
+            }
 
             JSObject ret = new JSObject();
             ret.put("success", true);
@@ -135,7 +139,11 @@ public class NotificationDetectionPlugin extends Plugin {
             try {
                 Intent fallback = new Intent(Settings.ACTION_SETTINGS);
                 fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                getContext().startActivity(fallback);
+                if (getActivity() != null) {
+                    getActivity().startActivity(fallback);
+                } else {
+                    getContext().startActivity(fallback);
+                }
 
                 JSObject ret = new JSObject();
                 ret.put("success", true);
@@ -143,6 +151,26 @@ public class NotificationDetectionPlugin extends Plugin {
             } catch (Exception ex) {
                 call.reject("No se pudo abrir la pantalla de ajustes de notificaciones: " + ex.getMessage(), ex);
             }
+        }
+    }
+
+    @PluginMethod
+    public void openAppSettings(PluginCall call) {
+        try {
+            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            if (getActivity() != null) {
+                getActivity().startActivity(intent);
+            } else {
+                getContext().startActivity(intent);
+            }
+
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("No se pudo abrir la información de la aplicación: " + e.getMessage(), e);
         }
     }
 
@@ -156,7 +184,11 @@ public class NotificationDetectionPlugin extends Plugin {
                 intent.setAction(Settings.ACTION_SETTINGS);
             }
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(intent);
+            if (getActivity() != null) {
+                getActivity().startActivity(intent);
+            } else {
+                getContext().startActivity(intent);
+            }
 
             JSObject ret = new JSObject();
             ret.put("success", true);
@@ -166,7 +198,11 @@ public class NotificationDetectionPlugin extends Plugin {
                 Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
                 fallback.setData(Uri.parse("package:" + getContext().getPackageName()));
                 fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                getContext().startActivity(fallback);
+                if (getActivity() != null) {
+                    getActivity().startActivity(fallback);
+                } else {
+                    getContext().startActivity(fallback);
+                }
 
                 JSObject ret = new JSObject();
                 ret.put("success", true);

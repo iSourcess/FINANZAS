@@ -27,6 +27,7 @@ export const useSettings = create((set, get) => ({
     includeDebtsInNetWorth: false,
     countInterestAsIncome: false,
     showAmountsOnWidget: false,
+    hasSeenTour: false,
     reminders: { ...DEFAULT_REMINDER_SETTINGS },
   },
   loading: false,
@@ -69,6 +70,9 @@ export const useSettings = create((set, get) => ({
         }
         if (typeof current.showAmountsOnWidget !== 'boolean') {
           current.showAmountsOnWidget = false
+        }
+        if (typeof current.hasSeenTour !== 'boolean') {
+          current.hasSeenTour = false
         }
         if (!current.reminders) {
           current.reminders = { ...DEFAULT_REMINDER_SETTINGS }

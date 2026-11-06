@@ -52,6 +52,13 @@ export default function AccountDetailModal({
   const [toastUndoId, setToastUndoId] = useState(null)
   const [lastAccrualDate, setLastAccrualDate] = useState(null)
 
+  // Resetear estados al cambiar de cuenta o abrir/cerrar
+  useEffect(() => {
+    if (isOpen) {
+      setConfirmDelete(false)
+    }
+  }, [isOpen, account?.id])
+
   // Cargar el último día acreditado para esta cuenta
   useEffect(() => {
     if (!account?.id) return

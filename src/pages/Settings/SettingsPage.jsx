@@ -9,7 +9,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft,
   PiggyBank,
   CalendarDays,
   Plus,
@@ -48,7 +47,9 @@ import {
   Info,
   LayoutGrid,
   BellRing,
+  Sparkles,
 } from 'lucide-react'
+import { useTour } from '../../store/useTour.js'
 import NotificationDetectionSection from './NotificationDetectionSection.jsx'
 import { AVAILABLE_FX_PAIRS } from '../../lib/constants.js'
 import { useFx } from '../../store/useFx.js'
@@ -87,6 +88,7 @@ import { formatMoney, centsToInput, inputToCents, formatDate, accountLabel } fro
 
 export default function SettingsPage() {
   const navigate = useNavigate()
+  const { startTour } = useTour()
   const {
     budgets,
     fixedExpenses,
@@ -515,48 +517,41 @@ export default function SettingsPage() {
 
   return (
     <div
-      className="min-h-screen flex flex-col"
+      className="min-h-screen flex flex-col pb-24"
       style={{
         background: 'var(--bg-base)',
         color: 'var(--text-primary)',
+        paddingBottom: 'calc(92px + env(safe-area-inset-bottom, 0px))',
       }}
     >
       {/* ── Header ── */}
       <header
-        className="flex items-center gap-3 px-4 py-3 sticky top-0 z-40"
+        className="flex items-center justify-between px-4 sm:px-6 py-3.5 sticky top-0 z-40"
         style={{
           borderBottom: '1px solid var(--border-subtle)',
           background: 'var(--bg-surface)',
         }}
       >
-        <button
-          onClick={() => navigate(-1)}
-          aria-label="Volver"
-          style={{
-            background: 'none',
-            border: 'none',
-            color: 'var(--text-primary)',
-            cursor: 'pointer',
-            padding: '8px',
-            borderRadius: 'var(--radius-md)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '44px',
-            minWidth: '44px',
-          }}
-        >
-          <ArrowLeft size={20} />
-        </button>
         <h1
           style={{
             fontFamily: "'Space Grotesk', sans-serif",
             fontSize: 'var(--font-size-xl)',
             fontWeight: 700,
+            color: 'var(--text-primary)',
           }}
         >
           Ajustes
         </h1>
+
+        <button
+          type="button"
+          onClick={() => startTour(0, navigate)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-[var(--orange-400)] bg-[var(--orange-900)] border border-[var(--orange-700)] hover:brightness-110 active:scale-95 transition-all"
+          title="Iniciar tour guiado"
+        >
+          <Sparkles size={14} />
+          <span>Ver tour</span>
+        </button>
       </header>
 
       {/* ── Contenido Principal ── */}

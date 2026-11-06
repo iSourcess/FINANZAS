@@ -64,7 +64,7 @@ export default function CardPicker({
                   {account.name}
                 </span>
                 {/* Tipo de cuenta — diferencia crédito vs débito de la misma marca */}
-                {typeLabel && (
+                {typeLabel && account.name?.trim().toLowerCase() !== typeLabel.trim().toLowerCase() && (
                   <span
                     className="block text-[9px] uppercase font-semibold tracking-wider mt-0.5"
                     style={{ color: subtleText }}

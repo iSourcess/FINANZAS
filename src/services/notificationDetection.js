@@ -22,22 +22,25 @@ let NotificationDetectionPlugin = null
 /**
  * Obtiene de forma perezosa la instancia del plugin de Capacitor.
  */
-async function getPlugin() {
+function getPlugin() {
   if (NotificationDetectionPlugin) return NotificationDetectionPlugin
 
-  try {
-    const corePkg = '@capacitor/core'
-    const coreModule = await import(/* @vite-ignore */ corePkg).catch(() => null)
-    const Capacitor = coreModule?.Capacitor || (typeof window !== 'undefined' ? window.Capacitor : null)
-
-    if (Capacitor && typeof Capacitor.registerPlugin === 'function') {
-      NotificationDetectionPlugin = Capacitor.registerPlugin('NotificationDetection')
+  if (typeof window !== 'undefined') {
+    if (window.Capacitor?.Plugins?.NotificationDetection) {
+      NotificationDetectionPlugin = window.Capacitor.Plugins.NotificationDetection
+      return NotificationDetectionPlugin
     }
-  } catch (err) {
-    console.warn('[notificationDetection] No se pudo cargar el plugin Capacitor:', err)
+    if (typeof window.Capacitor?.registerPlugin === 'function') {
+      try {
+        NotificationDetectionPlugin = window.Capacitor.registerPlugin('NotificationDetection')
+        return NotificationDetectionPlugin
+      } catch (err) {
+        console.warn('[notificationDetection] Error registrando NotificationDetection:', err)
+      }
+    }
   }
 
-  return NotificationDetectionPlugin
+  return null
 }
 
 /**
@@ -45,8 +48,8 @@ async function getPlugin() {
  * @returns {Promise<{ isPermissionGranted: boolean, isConnected: boolean, isDetectionEnabled: boolean }>}
  */
 export async function getListenerStatus() {
-  const plugin = await getPlugin()
-  if (!plugin) {
+  const plugin = getPlugin()
+  if (!plugin || typeof plugin.getListenerStatus !== 'function') {
     return { isPermissionGranted: false, isConnected: false, isDetectionEnabled: false }
   }
 
@@ -67,14 +70,37 @@ export async function getListenerStatus() {
  * Abre la pantalla de ajustes de acceso a notificaciones del sistema Android.
  */
 export async function openListenerSettings() {
-  const plugin = await getPlugin()
-  if (!plugin) return false
+  const plugin = getPlugin()
+  if (!plugin || typeof plugin.openListenerSettings !== 'function') {
+    console.warn('[notificationDetection] openListenerSettings: plugin no disponible')
+    return false
+  }
 
   try {
-    await plugin.openListenerSettings()
-    return true
+    const res = await plugin.openListenerSettings()
+    return Boolean(res?.success)
   } catch (err) {
     console.error('[notificationDetection] Error abriendo ajustes de listener:', err)
+    return false
+  }
+}
+
+/**
+ * Abre la pantalla de Información de la aplicación en Ajustes de Android
+ * (necesaria en Android 13+ para desbloquear "Ajustes restringidos").
+ */
+export async function openAppSettings() {
+  const plugin = getPlugin()
+  if (!plugin || typeof plugin.openAppSettings !== 'function') {
+    console.warn('[notificationDetection] openAppSettings: plugin no disponible')
+    return false
+  }
+
+  try {
+    const res = await plugin.openAppSettings()
+    return Boolean(res?.success)
+  } catch (err) {
+    console.error('[notificationDetection] Error abriendo información de la app:', err)
     return false
   }
 }
@@ -83,8 +109,11 @@ export async function openListenerSettings() {
  * Abre la pantalla de ajustes de optimización de batería.
  */
 export async function openBatteryOptimizationSettings() {
-  const plugin = await getPlugin()
-  if (!plugin) return false
+  const plugin = getPlugin()
+  if (!plugin || typeof plugin.openBatteryOptimizationSettings !== 'function') {
+    console.warn('[notificationDetection] openBatteryOptimizationSettings: plugin no disponible')
+    return false
+  }
 
   try {
     await plugin.openBatteryOptimizationSettings()

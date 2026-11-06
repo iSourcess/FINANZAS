@@ -15,11 +15,13 @@ import {
   Smartphone,
   CheckCircle2,
   Info,
+  AlertTriangle,
 } from 'lucide-react'
 import Modal from '../ui/Modal.jsx'
 import Button from '../ui/Button.jsx'
 import {
   openListenerSettings,
+  openAppSettings,
   openBatteryOptimizationSettings,
 } from '../../services/notificationDetection.js'
 
@@ -32,13 +34,22 @@ export default function NotificationListenerModal({
 
   const handleOpenSettings = async () => {
     await openListenerSettings()
-    if (typeof onSettingsOpened === 'function') {
-      onSettingsOpened()
-    }
+  }
+
+  const handleOpenAppSettings = async () => {
+    await openAppSettings()
   }
 
   const handleOpenBatterySettings = async () => {
     await openBatteryOptimizationSettings()
+  }
+
+  const handleCheckAndClose = () => {
+    if (typeof onSettingsOpened === 'function') {
+      onSettingsOpened()
+    } else {
+      onClose()
+    }
   }
 
   return (
@@ -117,22 +128,74 @@ export default function NotificationListenerModal({
               </div>
             </div>
 
-            {/* Botón para abrir ajustes */}
-            <div className="pt-2 flex flex-col gap-2">
+            {/* Botón principal para abrir ajustes de notificaciones */}
+            <div className="pt-1 flex flex-col gap-2">
               <Button
                 variant="primary"
                 onClick={handleOpenSettings}
                 className="w-full flex items-center justify-center gap-2"
                 style={{ minHeight: '44px' }}
               >
-                <span>Abrir Ajustes de notificaciones</span>
+                <span>1. Abrir Acceso a notificaciones</span>
                 <ExternalLink size={16} />
+              </Button>
+            </div>
+
+            {/* Aviso especial para Android 13+ (Ajustes restringidos) */}
+            <div
+              className="p-3 rounded-xl flex flex-col gap-2"
+              style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+              }}
+            >
+              <div className="flex items-center gap-2 text-[var(--orange-400)] font-bold">
+                <AlertTriangle size={15} className="flex-shrink-0" />
+                <span>¿Aparece en gris o dice &quot;Ajuste restringido&quot;?</span>
+              </div>
+              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                Por seguridad, Android 13, 14 y 15 bloquea este permiso en apps instaladas por APK. Para desbloquearlo:
+              </p>
+              <ol className="text-[11px] text-[var(--text-secondary)] flex flex-col gap-1.5 list-decimal pl-4">
+                <li>
+                  Toca <strong className="text-white">&quot;Desbloquear en Info de la app&quot;</strong> abajo.
+                </li>
+                <li>
+                  Toca los <strong className="text-white">3 puntos (⋮)</strong> en la esquina superior derecha.
+                </li>
+                <li>
+                  Selecciona <strong className="text-white">&quot;Permitir ajustes restringidos&quot;</strong> e introduce tu huella o PIN.
+                </li>
+                <li>
+                  Vuelve a presionar <strong className="text-white">&quot;1. Abrir Acceso a notificaciones&quot;</strong> y activa el interruptor de Finanzas.
+                </li>
+              </ol>
+              <Button
+                variant="outline"
+                onClick={handleOpenAppSettings}
+                className="w-full flex items-center justify-center gap-2 mt-1"
+                style={{ minHeight: '38px', fontSize: '11px' }}
+              >
+                <span>Desbloquear en Info de la app</span>
+                <ExternalLink size={14} />
+              </Button>
+            </div>
+
+            {/* Botones de cierre / comprobación */}
+            <div className="pt-2 flex flex-col gap-2">
+              <Button
+                variant="primary"
+                onClick={handleCheckAndClose}
+                className="w-full"
+                style={{ minHeight: '40px', background: 'var(--green-500)', color: 'white' }}
+              >
+                <span>Ya lo activé / Comprobar</span>
               </Button>
               <Button
                 variant="ghost"
                 onClick={onClose}
                 className="w-full"
-                style={{ minHeight: '44px' }}
+                style={{ minHeight: '36px' }}
               >
                 Cerrar
               </Button>

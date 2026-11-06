@@ -252,13 +252,13 @@ export function calculateHistoricalInterest({
           dailyInt = calculateAccountDailyInterest(acc, bal)
           bucketProjectedCents += dailyInt
           bucketByAccount[acc.id].projectedCents += dailyInt
-        } else if (accrualsMap) {
-          // Pasado: lee directamente las acreditaciones reales de interestAccruals (sin reconstruir saldos)
+        } else if (accrualsMap && accrualsMap.has(`${acc.id}_${dStr}`)) {
+          // Pasado con acreditación real registrada en interestAccruals
           dailyInt = accrualsMap.get(`${acc.id}_${dStr}`) || 0
           bucketPastCents += dailyInt
           bucketByAccount[acc.id].pastCents += dailyInt
         } else {
-          // Pasado sin registros: reconstruir saldo histórico como fallback
+          // Pasado sin registro explícito: estimar con base en saldo histórico
           const histBalance = reconstructHistoricalBalance(acc, relevantMovements, dStr)
           dailyInt = calculateAccountDailyInterest(acc, histBalance)
           bucketPastCents += dailyInt
